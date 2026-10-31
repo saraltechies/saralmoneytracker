@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Saral Money Tracker</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_transactions">Entries</string>
+    <string name="tab_stats">Stats</string>
+    <string name="tab_budgets">Budgets</string>
+    <string name="tab_accounts">Accounts</string>
+
+    <!-- Common -->
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="remove">Remove</string>
+    <string name="edit">Edit</string>
+    <string name="clear">Clear</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="undo">Undo</string>
+    <string name="search">Search</string>
+    <string name="settings">Settings</string>
+    <string name="all">All</string>
+    <string name="name">Name</string>
+    <string name="manage">Manage</string>
+    <string name="see_all">See all</string>
+    <string name="see_details">Details</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="this_week">This week</string>
+    <string name="previous_period">Previous</string>
+    <string name="next_period">Next</string>
+    <string name="uncategorized">Uncategorized</string>
+    <string name="repeating">Repeating</string>
+    <string name="backspace">Backspace</string>
+
+    <string name="type_expense">Expense</string>
+    <string name="type_income">Income</string>
+    <string name="type_transfer">Transfer</string>
+    <string name="income">Income</string>
+    <string name="expense">Expense</string>
+    <string name="net">Net</string>
+    <string name="saved">Saved</string>
+    <string name="spent">Spent</string>
+    <string name="money_in">Money in</string>
+    <string name="money_out">Money out</string>
+
+    <string name="period_day">Day</string>
+    <string name="period_week">Week</string>
+    <string name="period_month">Month</string>
+    <string name="period_year">Year</string>
+    <string name="period_custom">Range</string>
+
+    <!-- Home -->
+    <string name="add_entry">Add</string>
+    <string name="spent_today">Spent today</string>
+    <string name="spent_this_week">Spent this week</string>
+    <string name="total_balance">Total balance</string>
+    <string name="monthly_budget">Monthly budget</string>
+    <string name="budget_none_title">Set a monthly budget</string>
+    <string name="budget_none_text">Give your main categories a limit and see each day how much you can still spend.</string>
+    <string name="budget_left">%1$s left</string>
+    <string name="budget_over">Over budget by %1$s</string>
+    <plurals name="budget_safe_per_day">
+        <item quantity="one">%1$s left · %2$s for the last day</item>
+        <item quantity="other">%1$s left · about %2$s a day for %3$d days</item>
+    </plurals>
+    <string name="top_spending">Top spending this month</string>
+    <string name="coming_up">Coming up</string>
+    <string name="recent">Recent</string>
+    <string name="no_entries_yet">Nothing yet. Tap Add to record your first expense or income.</string>
+    <plurals name="entries_total">
+        <item quantity="one">%d entry in total</item>
+        <item quantity="other">%d entries in total</item>
+    </plurals>
+    <string name="welcome_title">Welcome to Saral Money Tracker</string>
+    <string name="welcome_text">Start with your account balances, or bring in the expense sheet you already keep in Excel.</string>
+    <string name="welcome_balances">Set balances</string>
+    <string name="welcome_import">Import Excel</string>
+    <string name="update_ready">A new version of Saral Money Tracker has been downloaded. Restart to use it.</string>
+    <string name="restart">Restart</string>
+
+    <!-- Entries list -->
+    <string name="search_hint">Search notes and categories</string>
+    <string name="search_empty_title">Nothing found</string>
+    <string name="search_empty_text">Try another word. Search looks through every entry, not just this month.</string>
+    <string name="list_empty_title">No entries here</string>
+    <string name="list_empty_text">Nothing was recorded in this period. Use the arrows to look at another one.</string>
+    <plurals name="entries">
+        <item quantity="one">%d entry</item>
+        <item quantity="other">%d entries</item>
+    </plurals>
+
+    <!-- Add / edit -->
+    <string name="new_entry">New entry</string>
+    <string name="edit_entry">Edit entry</string>
+    <string name="new_repeating">New repeating entry</string>
+    <string name="edit_repeating">Edit repeating entry</string>
+    <string name="category">Category</string>
+    <string name="account">Account</string>
+    <string name="paid_from">Paid from</string>
+    <string name="received_in">Received in</string>
+    <string name="from_account">From</string>
+    <string name="to_account">To</string>
+    <string name="swap_accounts">Swap accounts</string>
+    <string name="transfer_hint">Paying a credit card bill, withdrawing cash or moving money to savings is a transfer: it isn\'t counted as spending.</string>
+    <string name="date">Date</string>
+    <string name="starts_on">First date</string>
+    <string name="repeat">Repeat</string>
+    <string name="repeat_never">Doesn\'t repeat</string>
+    <string name="repeat_daily">Every day</string>
+    <string name="repeat_weekly">Every week</string>
+    <string name="repeat_monthly">Every month</string>
+    <string name="repeat_yearly">Every year</string>
+    <string name="note_hint">Note (optional)</string>
+    <string name="error_amount">Enter an amount</string>
+    <string name="error_transfer_accounts">Choose two different accounts</string>
+    <string name="error_account">Choose an account</string>
+    <string name="delete_entry_title">Delete this entry?</string>
+    <string name="delete_entry_text">You can undo this right after.</string>
+    <string name="delete_repeating_title">Stop this repeating entry?</string>
+    <string name="delete_repeating_text">No new copies will be added. Entries already added stay.</string>
+    <string name="entry_deleted">Entry deleted</string>
+
+    <!-- Stats -->
+    <string name="stats_total">Total</string>
+    <string name="stats_per_day">Per day</string>
+    <string name="stats_vs_previous">vs previous</string>
+    <string name="stats_empty_expense">No spending in this period</string>
+    <string name="stats_empty_income">No income in this period</string>
+    <string name="stats_empty_text">Pick another period, or add entries to see where your money goes.</string>
+    <string name="by_category">By category</string>
+    <string name="trend">Trend</string>
+    <string name="chart_by_category">Chart of amounts by category</string>
+    <string name="chart_trend">Chart of amounts over time</string>
+    <string name="savings_rate">You kept %1$d%% of your income</string>
+
+    <!-- Budgets -->
+    <string name="budgeted">Budgeted</string>
+    <string name="not_budgeted">Without a budget</string>
+    <string name="set_budgets">Set your budgets</string>
+    <string name="budget_intro">Tap a category to give it a monthly limit. The total of all limits is your monthly budget.</string>
+    <string name="set_budget">Set budget</string>
+    <string name="budget_for">Budget for %1$s</string>
+    <string name="per_month">Per month</string>
+    <string name="budget_spent_of">%1$s spent</string>
+    <string name="spent_amount">%1$s spent</string>
+    <string name="budget_per_month">Budget %1$s a month</string>
+
+    <!-- Accounts -->
+    <string name="net_worth">Net worth</string>
+    <string name="you_have">You have</string>
+    <string name="you_owe">You owe</string>
+    <string name="accounts_hint">Balances add up everything recorded since the opening balance. A credit card shows what you owe as a minus.</string>
+    <string name="add_account">Add account</string>
+    <string name="edit_account">Edit account</string>
+    <string name="new_transfer">New transfer</string>
+    <string name="opening_balance">Opening balance</string>
+    <string name="opening_balance_hint">What\'s in it today, before any entries</string>
+    <string name="opening_balance_card_hint">What you owe today, as a minus (for example -5000)</string>
+    <string name="hidden_accounts">Hidden</string>
+    <string name="show_again">Show again</string>
+    <string name="account_hidden">Account hidden. Its past entries are kept.</string>
+    <string name="account_deleted">Account deleted</string>
+    <string name="account_type_cash">Cash</string>
+    <string name="account_type_bank">Bank</string>
+    <string name="account_type_card">Credit card</string>
+    <string name="account_type_wallet">Wallet / UPI</string>
+    <string name="account_type_other">Other</string>
+
+    <!-- Categories -->
+    <string name="categories">Categories</string>
+    <string name="categories_summary">Add, rename, recolour and reorder</string>
+    <string name="add_category">Add category</string>
+    <string name="edit_category">Edit category</string>
+    <string name="colour">Colour</string>
+    <string name="icon">Icon</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
+    <string name="category_hidden">Category hidden. Its past entries are kept.</string>
+    <string name="category_deleted">Category deleted</string>
+
+    <!-- Repeating -->
+    <string name="repeating_entries">Repeating entries</string>
+    <string name="repeating_summary">Salary, rent, EMIs, SIPs and subscriptions</string>
+    <string name="add_repeating">Add repeating</string>
+    <string name="repeating_empty_title">Nothing repeats yet</string>
+    <string name="repeating_empty_text">Add your salary, rent, EMIs or subscriptions once, and they\'re recorded on their dates by themselves.</string>
+    <string name="next_on">Next: %1$s</string>
+    <string name="paused">Paused</string>
+
+    <!-- Settings -->
+    <string name="settings_general">General</string>
+    <string name="settings_organise">Organise</string>
+    <string name="settings_reminder">Reminder</string>
+    <string name="settings_privacy">Privacy and security</string>
+    <string name="settings_data">Your data</string>
+    <string name="settings_about">About</string>
+    <string name="currency">Currency</string>
+    <string name="month_starts_on">Month starts on</string>
+    <string name="month_starts_on_value">Day %1$d of the month</string>
+    <string name="month_starts_calendar">1st (calendar month)</string>
+    <string name="week_starts_on">Week starts on</string>
+    <string name="theme">Theme</string>
+    <string name="theme_system">Same as phone</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="daily_reminder">Daily reminder</string>
+    <string name="daily_reminder_summary">A nudge in the evening, only on days nothing was added</string>
+    <string name="reminder_time">Reminder time</string>
+    <string name="reminder_permission_denied">Allow notifications for Saral Money Tracker to get the reminder</string>
+    <string name="app_lock">App lock</string>
+    <string name="app_lock_summary">Ask for your fingerprint, face or phone PIN when the app opens</string>
+    <string name="app_lock_unavailable">Set a screen lock on your phone first to use this</string>
+    <string name="hide_in_recents">Hide in recent apps</string>
+    <string name="hide_in_recents_summary">Blank preview in the app switcher, and no screenshots</string>
+    <string name="privacy_promise">Private by design</string>
+    <string name="privacy_promise_text">No internet access, no ads, no account. Your money data stays on this phone.</string>
+    <string name="import_excel">Import from Excel</string>
+    <string name="import_excel_summary">Bring in your expense sheet, or restore a backup</string>
+    <string name="export_excel">Export to Excel (backup)</string>
+    <string name="export_excel_summary">Everything in one .xlsx file. Keep it safe; import it to restore.</string>
+    <string name="export_csv">Export entries as CSV</string>
+    <string name="export_csv_summary">For other apps and spreadsheets</string>
+    <string name="export_done">Saved</string>
+    <string name="export_failed">Couldn\'t save the file</string>
+    <string name="delete_all">Delete all data</string>
+    <string name="delete_all_summary">Start again from scratch</string>
+    <string name="delete_all_title">Delete everything?</string>
+    <string name="delete_all_text">All entries, accounts, categories, budgets and repeating entries will be deleted from this phone. This can\'t be undone unless you exported a backup. Type %1$s to confirm.</string>
+    <string name="delete_all_word">DELETE</string>
+    <string name="delete_all_done">All data deleted</string>
+    <string name="rate_app">Rate Saral Money Tracker</string>
+    <string name="rate_app_summary">It takes a minute and helps a lot</string>
+    <string name="share_app">Share the app</string>
+    <string name="share_app_summary">Tell a friend who wants to manage money better</string>
+    <string name="share_text">I track my income and expenses with Saral Money Tracker. Free, private, no ads: %1$s</string>
+    <string name="source_code">Source code</string>
+    <string name="source_code_summary">Open source on GitHub (GPL-3.0)</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="more_apps">More from Saral Techies</string>
+    <string name="app_file_manager">Saral File Manager</string>
+    <string name="app_file_manager_summary">Simple, private file manager</string>
+    <string name="app_reader">SaralReader</string>
+    <string name="app_reader_summary">PDF reader with highlighter</string>
+    <string name="app_qrscan">SaralQRScan</string>
+    <string name="app_qrscan_summary">QR code and barcode scanner</string>
+    <string name="app_authenticator">Saral Authenticator</string>
+    <string name="app_authenticator_summary">2-step verification codes</string>
+    <string name="website">Website</string>
+    <string name="about_version">Saral Money Tracker %1$s by Saral Techies</string>
+
+    <!-- Import -->
+    <string name="import_intro_title">Bring in your Excel sheet</string>
+    <string name="import_intro_text">Choose an .xlsx file (Excel, Google Sheets or LibreOffice). Saral Money Tracker understands:</string>
+    <string name="import_intro_point1">Monthly trackers with \"Money Out\" and \"Money In\" tables, one sheet per month</string>
+    <string name="import_intro_point2">Any table with Date, Amount, Category and Description columns</string>
+    <string name="import_intro_point3">Bank statements with Debit and Credit columns</string>
+    <string name="import_intro_point4">Backups exported from this app</string>
+    <string name="import_intro_safe">You\'ll see what was found before anything is added. Entries already in the app are skipped, so importing the same file twice is safe.</string>
+    <string name="import_choose_file">Choose file</string>
+    <string name="import_choose_other">Choose another file</string>
+    <string name="import_reading">Reading the file…</string>
+    <string name="import_not_xlsx">This isn\'t an .xlsx file. In Excel or Google Sheets, use Save as / Download as .xlsx and try again.</string>
+    <string name="import_read_failed">The file couldn\'t be read. It may be damaged or password protected.</string>
+    <string name="import_nothing_found">No entries found. The sheet needs a header row with a Date column and an Amount (or Debit/Credit) column.</string>
+    <string name="import_failed">Import failed. Nothing was changed.</string>
+    <string name="import_found">Found in your file</string>
+    <string name="import_found_backup">Saral Money Tracker backup</string>
+    <plurals name="import_found_expenses">
+        <item quantity="one">%1$d expense, %2$s</item>
+        <item quantity="other">%1$d expenses, %2$s</item>
+    </plurals>
+    <plurals name="import_found_income">
+        <item quantity="one">%1$d income entry, %2$s</item>
+        <item quantity="other">%1$d income entries, %2$s</item>
+    </plurals>
+    <plurals name="import_found_transfers">
+        <item quantity="one">%d transfer</item>
+        <item quantity="other">%d transfers</item>
+    </plurals>
+    <string name="import_found_range">From %1$s to %2$s</string>
+    <plurals name="import_found_duplicates">
+        <item quantity="one">%d exact copy inside the file will be skipped</item>
+        <item quantity="other">%d exact copies inside the file will be skipped (for example a month sheet copied from another)</item>
+    </plurals>
+    <plurals name="import_found_skipped">
+        <item quantity="one">%d row had an amount but no date we could read</item>
+        <item quantity="other">%d rows had an amount but no date we could read</item>
+    </plurals>
+    <string name="import_found_sheets">Sheets read: %1$s</string>
+    <string name="import_account">Account for these entries</string>
+    <string name="import_account_hint">Used for rows that don\'t say which account they were paid from.</string>
+    <string name="import_card_title">Credit card bills are transfers</string>
+    <plurals name="import_card_text">
+        <item quantity="one">%d \"Credit Card\" row looks like a bill payment. Paying a card bill isn\'t new spending (the purchases are already counted), so import it as a transfer to a credit card account.</item>
+        <item quantity="other">%d \"Credit Card\" rows look like bill payments. Paying a card bill isn\'t new spending (the purchases are already counted), so import them as transfers to a credit card account.</item>
+    </plurals>
+    <string name="import_budgets_title">Use planned amounts as budgets</string>
+    <plurals name="import_budgets_text">
+        <item quantity="one">%d category has a planned amount in your summary sheet.</item>
+        <item quantity="other">%d categories have planned amounts in your summary sheet.</item>
+    </plurals>
+    <plurals name="import_button">
+        <item quantity="one">Import %d entry</item>
+        <item quantity="other">Import %d entries</item>
+    </plurals>
+    <plurals name="import_done">
+        <item quantity="one">%d entry imported</item>
+        <item quantity="other">%d entries imported</item>
+    </plurals>
+    <plurals name="import_done_duplicates">
+        <item quantity="one">%d duplicate skipped</item>
+        <item quantity="other">%d duplicates skipped</item>
+    </plurals>
+    <plurals name="import_done_transfers">
+        <item quantity="one">%d card bill payment recorded as a transfer</item>
+        <item quantity="other">%d card bill payments recorded as transfers</item>
+    </plurals>
+    <plurals name="import_done_categories">
+        <item quantity="one">%d new category</item>
+        <item quantity="other">%d new categories</item>
+    </plurals>
+    <plurals name="import_done_accounts">
+        <item quantity="one">%d new account</item>
+        <item quantity="other">%d new accounts</item>
+    </plurals>
+    <plurals name="import_done_budgets">
+        <item quantity="one">%d budget set</item>
+        <item quantity="other">%d budgets set</item>
+    </plurals>
+    <plurals name="import_done_recurring">
+        <item quantity="one">%d repeating entry</item>
+        <item quantity="other">%d repeating entries</item>
+    </plurals>
+    <string name="import_see_entries">See entries</string>
+
+    <!-- App lock -->
+    <string name="lock_locked">Locked to keep your money data private</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_prompt_title">Unlock Saral Money Tracker</string>
+    <string name="lock_prompt_subtitle">Use your fingerprint, face or phone PIN</string>
+
+    <!-- Reminder -->
+    <string name="reminder_channel">Daily reminder</string>
+    <string name="reminder_title">Anything spent today?</string>
+    <string name="reminder_text">Add today\'s expenses in a few seconds while you remember them.</string>
+
+    <!-- Launcher shortcuts -->
+    <string name="shortcut_expense">Add expense</string>
+    <string name="shortcut_income">Add income</string>
+    <string name="shortcut_transfer">Transfer</string>
+
+    <!-- Defaults for a new install (people can rename them) -->
+    <string name="default_account_cash">Cash</string>
+    <string name="default_account_bank">Bank account</string>
+    <string name="default_account_card">Credit card</string>
+    <string name="default_other_expense">Other</string>
+    <string name="default_other_income">Other Income</string>
+    <string-array name="default_expense_categories">
+        <item>Food &amp; Dining</item>
+        <item>Groceries</item>
+        <item>Transport</item>
+        <item>Fuel</item>
+        <item>Shopping</item>
+        <item>Bills &amp; Utilities</item>
+        <item>Rent</item>
+        <item>EMI &amp; Loans</item>
+        <item>Health</item>
+        <item>Education</item>
+        <item>Entertainment</item>
+        <item>Travel</item>
+        <item>Personal Care</item>
+        <item>Family</item>
+        <item>Gifts &amp; Donations</item>
+        <item>Investments</item>
+        <item>Business</item>
+        <item>Other</item>
+    </string-array>
+    <string-array name="default_income_categories">
+        <item>Salary</item>
+        <item>Business</item>
+        <item>Freelance</item>
+        <item>Rental Income</item>
+        <item>Interest &amp; Dividends</item>
+        <item>Bonus</item>
+        <item>Refunds &amp; Cashback</item>
+        <item>Gifts Received</item>
+        <item>Other Income</item>
+    </string-array>
+</resources>

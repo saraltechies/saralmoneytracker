@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark window behind the app in dark mode, so nothing flashes white while it starts. -->
+    <style name="Theme.SaralMoneyTracker" parent="android:Theme.Material.NoActionBar">
+    </style>
+</resources>

@@ -1,0 +1,271 @@
+<!doctype html>
+<!--
+  Source for the Saral Money Tracker Play Store graphics. Render each view with headless Chrome:
+    chrome --headless=new --hide-scrollbars --window-size=W,H --screenshot=out.png "file:///.../store.html#view"
+  Views: icon (512x512), feature (1024x500), s1..s5 (1080x1920 phone screenshots). See render.sh.
+  The phone screens are drawings of the app's real layouts (home, add entry, stats, budgets, Excel import). Replace them
+  with real captures when convenient (see store/listing.md).
+  The wallet mark is the launcher icon (res/drawable/ic_launcher_foreground.xml) drawn as SVG.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,1,0&display=block" rel="stylesheet">
+<style>
+  :root { --blue:#0D6EFD; --navy:#0D1B4A; --amber:#FFC107; --ink:#1A1A2E; --slate:#64748B; --mist:#F0F6FF; --green:#15803D; --red:#DC2626; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { font-family:Roboto, sans-serif; overflow:hidden; }
+  .view { display:none; }
+  .ms { font-family:'Material Symbols Rounded'; font-weight:normal; font-style:normal; line-height:1; letter-spacing:normal;
+        text-transform:none; display:inline-block; white-space:nowrap; font-feature-settings:'liga'; -webkit-font-smoothing:antialiased; }
+
+  #icon { width:512px; height:512px; background:var(--blue); }
+  #icon svg { width:512px; height:512px; display:block; }
+
+  #feature { width:1024px; height:500px; position:relative; overflow:hidden; color:#fff;
+             background:linear-gradient(120deg, var(--navy) 0%, #11307f 55%, var(--blue) 100%); }
+  #feature .txt { position:absolute; left:64px; top:80px; width:600px; }
+  #feature .brand { display:flex; align-items:center; gap:20px; }
+  #feature .brand svg { width:92px; height:92px; border-radius:22px; background:var(--blue); box-shadow:0 8px 24px rgba(0,0,0,.25); }
+  #feature h1 { font-size:50px; font-weight:900; letter-spacing:-1px; line-height:1.05; }
+  #feature p { margin-top:24px; font-size:28px; line-height:1.3; font-weight:500; color:#DCE8FF; }
+  #feature .chips { margin-top:26px; display:flex; gap:10px; flex-wrap:wrap; }
+  #feature .chip { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:8px 16px; font-size:19px; font-weight:500; }
+  #feature .by { position:absolute; left:64px; bottom:30px; font-size:17px; color:#93C5FD; }
+  #feature .panel { position:absolute; right:64px; top:62px; width:290px; background:#fff; color:var(--ink); border-radius:22px; padding:20px;
+                    box-shadow:0 18px 40px rgba(0,0,0,.35); }
+  #feature .panel small { color:var(--slate); font-size:15px; }
+  #feature .panel .big { font-size:34px; font-weight:900; margin:2px 0 12px; }
+  #feature .line { display:flex; align-items:center; gap:10px; font-size:16px; margin-top:10px; }
+  #feature .line .d { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  #feature .line .n { flex:1; }
+  #feature .pb { height:7px; border-radius:4px; background:#E2E8F0; margin-top:6px; overflow:hidden; }
+  #feature .pb i { display:block; height:100%; border-radius:4px; }
+
+  /* ---------- phone screenshots ---------- */
+  .shot { width:1080px; height:1920px; position:relative; overflow:hidden; color:#fff;
+          background:linear-gradient(170deg, var(--navy) 0%, #12307c 45%, var(--blue) 100%); }
+  .shot .cap { position:absolute; top:100px; left:70px; right:70px; text-align:center; }
+  .shot .cap h2 { font-size:70px; font-weight:900; line-height:1.08; letter-spacing:-1px; }
+  .shot .cap p { margin-top:22px; font-size:36px; color:#DCE8FF; font-weight:500; }
+  .shot .phone { position:absolute; left:150px; top:430px; width:780px; height:1603px; border-radius:64px; background:#0b0f1e;
+                 padding:20px; box-shadow:0 30px 80px rgba(0,0,0,.45); }
+  .scr { width:740px; height:1563px; border-radius:46px; overflow:hidden; background:#F8FAFF; color:var(--ink); position:relative; font-size:26px; }
+  .status { height:56px; padding:0 34px; display:flex; align-items:center; justify-content:space-between; font-size:22px; font-weight:500; }
+  .bar { height:96px; padding:0 18px 0 30px; display:flex; align-items:center; gap:22px; font-size:33px; font-weight:500; }
+  .bar .sp { flex:1; }
+  .bar .ms { font-size:38px; }
+  .sec { padding:22px 32px 10px; font-size:23px; font-weight:700; color:var(--blue); }
+  .hero { margin:8px 22px; border-radius:36px; padding:30px; color:#fff; background:linear-gradient(135deg, var(--blue), var(--navy)); }
+  .hero small { font-size:21px; color:rgba(255,255,255,.8); }
+  .hero .big { font-size:54px; font-weight:900; margin:4px 0 18px; }
+  .hero .g { display:grid; grid-template-columns:1fr 1fr; gap:14px 20px; }
+  .hero .g b { display:block; font-size:28px; font-weight:500; margin-top:2px; }
+  .hero .tb { margin-top:18px; background:rgba(255,255,255,.13); border-radius:18px; padding:14px 18px; display:flex; justify-content:space-between; font-size:23px; }
+  .card { margin:10px 22px; background:var(--mist); border-radius:28px; padding:24px; }
+  .card .h { display:flex; justify-content:space-between; font-size:24px; font-weight:500; }
+  .card small { display:block; font-size:20px; color:var(--slate); margin-top:10px; }
+  .pb { height:12px; border-radius:6px; background:#DCE3EE; margin-top:14px; overflow:hidden; }
+  .pb i { display:block; height:100%; border-radius:6px; }
+  .row { display:flex; align-items:center; gap:22px; padding:15px 30px; }
+  .row .ic { width:58px; height:58px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px; flex:none; }
+  .row .t { flex:1; min-width:0; }
+  .row .n { font-size:26px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row small { font-size:20px; color:var(--slate); }
+  .row .a { font-size:26px; font-weight:700; }
+  .row .pb { height:9px; margin-top:8px; }
+  .neg { color:var(--red); } .pos { color:var(--green); }
+  .fab { position:absolute; right:34px; bottom:130px; height:96px; padding:0 34px; border-radius:28px; background:#DCE8FF; color:var(--navy);
+         display:flex; align-items:center; gap:12px; font-size:28px; font-weight:500; box-shadow:0 6px 16px rgba(0,0,0,.18); }
+  .fab .ms { font-size:40px; }
+  .seg { display:flex; margin:6px 28px; border:2px solid #CBD5E1; border-radius:999px; overflow:hidden; font-size:23px; font-weight:500; }
+  .seg span { flex:1; text-align:center; padding:14px 0; border-left:2px solid #CBD5E1; }
+  .seg span:first-child { border-left:0; }
+  .seg span.on { background:#DCE8FF; color:var(--navy); }
+  .amt { text-align:center; font-size:76px; font-weight:900; color:var(--red); margin-top:26px; }
+  .amt + small { display:block; text-align:center; font-size:24px; color:var(--slate); margin-bottom:16px; }
+  .cats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; padding:4px 20px; }
+  .cat { text-align:center; font-size:18px; padding:12px 2px; border-radius:20px; }
+  .cat .ms { width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 8px; font-size:32px; }
+  .cat.on { outline:3px solid #F97316; background:#FFF1E6; font-weight:700; }
+  .field { display:flex; align-items:center; gap:24px; padding:14px 32px; font-size:25px; }
+  .field .ms { color:var(--slate); font-size:34px; }
+  .field small { display:block; font-size:19px; color:var(--slate); }
+  .keys { position:absolute; left:0; right:0; bottom:96px; padding:16px 18px 24px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px; background:#F8FAFF; }
+  .keys span { background:var(--mist); border-radius:20px; height:84px; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:500; }
+  .keys span.op { background:#DCE8FF; font-weight:900; }
+  .keys .save { grid-column:1 / 5; background:var(--blue); color:#fff; border-radius:999px; height:86px; font-size:30px; }
+  .period { display:flex; align-items:center; justify-content:space-between; padding:8px 30px; font-size:30px; font-weight:700; }
+  .period .ms { font-size:44px; color:var(--slate); }
+  .donut { width:380px; height:380px; border-radius:50%; margin:16px auto; position:relative;
+           background:conic-gradient(#F97316 0 32%, #22C55E 32% 52%, #8B5CF6 52% 70%, #3B82F6 70% 82%, #EAB308 82% 92%, #94A3B8 92% 100%); }
+  .donut::after { content:''; position:absolute; inset:58px; background:#F8FAFF; border-radius:50%; }
+  .donut div { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:1; font-size:22px; color:var(--slate); }
+  .donut b { font-size:44px; color:var(--ink); font-weight:900; }
+  .found { margin:16px 26px; background:#DCE8FF; border-radius:28px; padding:28px; font-size:24px; line-height:1.55; }
+  .found h4 { font-size:28px; margin-bottom:8px; }
+  .opt { margin:12px 26px; background:var(--mist); border-radius:28px; padding:24px; display:flex; gap:20px; align-items:center; }
+  .opt h4 { font-size:25px; }
+  .opt p { font-size:20px; color:var(--slate); margin-top:6px; line-height:1.35; }
+  .sw { width:86px; height:50px; border-radius:25px; background:var(--blue); position:relative; flex:none; }
+  .sw::after { content:''; position:absolute; right:6px; top:6px; width:38px; height:38px; border-radius:50%; background:#fff; }
+  .btn { margin:22px 26px; background:var(--blue); color:#fff; border-radius:999px; text-align:center; padding:26px; font-size:28px; font-weight:500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="mark">
+      <path fill="#FFC107" d="M46,24 A10,10 0 1,1 46,44 A10,10 0 1,1 46,24 Z"/>
+      <path fill="#FFE082" d="M61,29 A7.5,7.5 0 1,1 61,44 A7.5,7.5 0 1,1 61,29 Z"/>
+      <path fill="#FFFFFF" d="M33,38 H75 C77.2,38 79,39.8 79,42 V70 C79,72.2 77.2,74 75,74 H33 C30.8,74 29,72.2 29,70 V42 C29,39.8 30.8,38 33,38 Z"/>
+      <path fill="#FFC107" d="M64,50 H81 V62 H64 C62.3,62 61,60.7 61,59 V53 C61,51.3 62.3,50 64,50 Z"/>
+      <path fill="#FFFFFF" d="M67,53.5 A2.5,2.5 0 1,1 67,58.5 A2.5,2.5 0 1,1 67,53.5 Z"/>
+      <path fill="none" stroke="#0D6EFD" stroke-width="3" stroke-linecap="round" d="M36,48 H53 M36,57 H48"/>
+    </g>
+  </defs>
+</svg>
+
+<div id="icon" class="view">
+  <svg viewBox="18 18 72 72"><use href="#mark"/></svg>
+</div>
+
+<div id="feature" class="view">
+  <div class="txt">
+    <div class="brand"><svg viewBox="18 18 72 72"><use href="#mark"/></svg><h1>Saral Money<br>Tracker</h1></div>
+    <p>Track income and expenses by day, week and month. Budgets that keep you on track.</p>
+    <div class="chips">
+      <span class="chip">Budgets</span><span class="chip">Excel import</span>
+      <span class="chip">Charts</span><span class="chip">Private</span>
+    </div>
+  </div>
+  <div class="by">by Saral Techies · saraltechies.com</div>
+  <div class="panel">
+    <small>October · Spent</small>
+    <div class="big">₹38,420</div>
+    <div class="line"><span class="d ms" style="background:#FFEDD5;color:#F97316">restaurant</span><span class="n">Food &amp; Dining</span><b>₹9,850</b></div>
+    <div class="pb"><i style="width:82%;background:#F97316"></i></div>
+    <div class="line"><span class="d ms" style="background:#DCFCE7;color:#22C55E">local_grocery_store</span><span class="n">Groceries</span><b>₹6,120</b></div>
+    <div class="pb"><i style="width:61%;background:#22C55E"></i></div>
+    <div class="line"><span class="d ms" style="background:#EDE9FE;color:#8B5CF6">home</span><span class="n">Rent</span><b>₹12,000</b></div>
+    <div class="pb"><i style="width:100%;background:#8B5CF6"></i></div>
+    <div class="line"><span class="d ms" style="background:#DBEAFE;color:#3B82F6">directions_bus</span><span class="n">Transport</span><b>₹2,340</b></div>
+    <div class="pb"><i style="width:39%;background:#3B82F6"></i></div>
+  </div>
+</div>
+
+<!-- s1: home -->
+<div id="s1" class="view shot">
+  <div class="cap"><h2>See where your money goes</h2><p>Today, this week and this month at a glance</p></div>
+  <div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span class="ms">signal_cellular_alt wifi battery_full</span></div>
+    <div class="bar">Saral Money Tracker<span class="sp"></span><span class="ms">search</span><span class="ms">settings</span></div>
+    <div class="hero">
+      <small>October 2026</small><br><small>Spent</small>
+      <div class="big">₹38,420</div>
+      <div class="g">
+        <div><small>Income</small><b>₹62,000</b></div><div><small>Saved</small><b>+₹23,580</b></div>
+        <div><small>Spent today</small><b>₹340</b></div><div><small>Spent this week</small><b>₹4,215</b></div>
+      </div>
+      <div class="tb"><span>Total balance</span><b>₹1,24,860</b></div>
+    </div>
+    <div class="card"><div class="h"><span>Monthly budget</span><span>₹38,420 / ₹45,000</span></div>
+      <div class="pb"><i style="width:85%;background:#D97706"></i></div>
+      <small>₹6,580 left · about ₹658 a day for 10 days</small></div>
+    <div class="sec">Recent</div>
+    <div class="row"><span class="ic ms" style="background:#FFEDD5;color:#F97316">restaurant</span><div class="t"><div class="n">Food &amp; Dining</div><small>Lunch with team · UPI</small></div><span class="a neg">-₹340</span></div>
+    <div class="row"><span class="ic ms" style="background:#DCFCE7;color:#22C55E">local_grocery_store</span><div class="t"><div class="n">Groceries</div><small>Weekly vegetables · Cash</small></div><span class="a neg">-₹860</span></div>
+    <div class="row"><span class="ic ms" style="background:#DCFCE7;color:#16A34A">payments</span><div class="t"><div class="n">Salary</div><small>October salary · Bank</small></div><span class="a pos">+₹62,000</span></div>
+    <div class="row"><span class="ic ms" style="background:#DCE8FF;color:#0D6EFD">swap_horiz</span><div class="t"><div class="n">Transfer</div><small>Bank → Credit card</small></div><span class="a" style="color:#64748B">₹12,400</span></div>
+    <div class="fab"><span class="ms">add</span>Add</div>
+  </div></div>
+</div>
+
+<!-- s2: add entry -->
+<div id="s2" class="view shot">
+  <div class="cap"><h2>Add an expense in seconds</h2><p>Keypad that adds up sums for you</p></div>
+  <div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span class="ms">signal_cellular_alt wifi battery_full</span></div>
+    <div class="bar"><span class="ms">arrow_back</span>New entry</div>
+    <div class="seg"><span class="on">Expense</span><span>Income</span><span>Transfer</span></div>
+    <div class="amt">250+120+45</div><small>= ₹415</small>
+    <div class="cats">
+      <div class="cat on"><span class="ms" style="background:#FFEDD5;color:#F97316">restaurant</span>Food &amp; Dining</div>
+      <div class="cat"><span class="ms" style="background:#DCFCE7;color:#22C55E">local_grocery_store</span>Groceries</div>
+      <div class="cat"><span class="ms" style="background:#DBEAFE;color:#3B82F6">directions_bus</span>Transport</div>
+      <div class="cat"><span class="ms" style="background:#E0F2FE;color:#0EA5E9">local_gas_station</span>Fuel</div>
+      <div class="cat"><span class="ms" style="background:#FCE7F3;color:#EC4899">shopping_bag</span>Shopping</div>
+      <div class="cat"><span class="ms" style="background:#FEF9C3;color:#CA8A04">receipt</span>Bills</div>
+      <div class="cat"><span class="ms" style="background:#EDE9FE;color:#8B5CF6">home</span>Rent</div>
+      <div class="cat"><span class="ms" style="background:#FEE2E2;color:#EF4444">medical_services</span>Health</div>
+    </div>
+    <div class="field"><span class="ms">account_balance_wallet</span><div><small>Paid from</small>UPI · PhonePe</div></div>
+    <div class="field"><span class="ms">calendar_today</span><div><small>Date</small>Today · 31 Oct 2026</div></div>
+    <div class="keys">
+      <span>7</span><span>8</span><span>9</span><span class="op">÷</span>
+      <span>4</span><span>5</span><span>6</span><span class="op">×</span>
+      <span>1</span><span>2</span><span>3</span><span class="op">−</span>
+      <span>.</span><span>0</span><span class="ms">backspace</span><span class="op">+</span>
+      <span class="save">Save</span>
+    </div>
+  </div></div>
+</div>
+
+<!-- s3: stats -->
+<div id="s3" class="view shot">
+  <div class="cap"><h2>Know your spending</h2><p>By day, week, month, year or any dates</p></div>
+  <div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span class="ms">signal_cellular_alt wifi battery_full</span></div>
+    <div class="bar">Stats</div>
+    <div class="seg"><span>Day</span><span>Week</span><span class="on">Month</span><span>Year</span><span>Range</span></div>
+    <div class="period"><span class="ms">chevron_left</span>October 2026<span class="ms">chevron_right</span></div>
+    <div class="donut"><div>Expense<b>₹38.4K</b></div></div>
+    <div class="row"><span class="ic ms" style="background:#FFEDD5;color:#F97316">home</span><div class="t"><div class="n">Rent</div><small>32% · 1 entry</small></div><span class="a">₹12,000</span></div>
+    <div class="row"><span class="ic ms" style="background:#DCFCE7;color:#22C55E">restaurant</span><div class="t"><div class="n">Food &amp; Dining</div><small>20% · 24 entries</small></div><span class="a">₹7,690</span></div>
+    <div class="row"><span class="ic ms" style="background:#EDE9FE;color:#8B5CF6">local_grocery_store</span><div class="t"><div class="n">Groceries</div><small>18% · 9 entries</small></div><span class="a">₹6,920</span></div>
+    <div class="row"><span class="ic ms" style="background:#DBEAFE;color:#3B82F6">directions_bus</span><div class="t"><div class="n">Transport</div><small>12% · 31 entries</small></div><span class="a">₹4,610</span></div>
+    <div class="row"><span class="ic ms" style="background:#FEF9C3;color:#CA8A04">receipt</span><div class="t"><div class="n">Bills &amp; Utilities</div><small>10% · 4 entries</small></div><span class="a">₹3,840</span></div>
+  </div></div>
+</div>
+
+<!-- s4: budgets -->
+<div id="s4" class="view shot">
+  <div class="cap"><h2>Stay within budget</h2><p>A limit per category and a safe amount per day</p></div>
+  <div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span class="ms">signal_cellular_alt wifi battery_full</span></div>
+    <div class="bar">Budgets</div>
+    <div class="period"><span class="ms">chevron_left</span>October 2026<span class="ms">chevron_right</span></div>
+    <div class="card"><small style="margin:0">Monthly budget</small><div style="font-size:46px;font-weight:900;margin:4px 0">₹45,000</div>
+      <div class="pb"><i style="width:85%;background:#D97706"></i></div>
+      <small>₹38,420 spent · ₹6,580 left · about ₹658 a day for 10 days</small></div>
+    <div class="sec">Budgeted</div>
+    <div class="row"><span class="ic ms" style="background:#FFEDD5;color:#F97316">restaurant</span><div class="t"><div class="n" style="display:flex;justify-content:space-between"><span>Food &amp; Dining</span><span>₹7,690 / ₹7,000</span></div><div class="pb"><i style="width:100%;background:#DC2626"></i></div><small class="neg">Over budget by ₹690</small></div></div>
+    <div class="row"><span class="ic ms" style="background:#DCFCE7;color:#22C55E">local_grocery_store</span><div class="t"><div class="n" style="display:flex;justify-content:space-between"><span>Groceries</span><span>₹6,920 / ₹8,000</span></div><div class="pb"><i style="width:86%;background:#D97706"></i></div><small>₹1,080 left</small></div></div>
+    <div class="row"><span class="ic ms" style="background:#DBEAFE;color:#3B82F6">directions_bus</span><div class="t"><div class="n" style="display:flex;justify-content:space-between"><span>Transport</span><span>₹4,610 / ₹6,000</span></div><div class="pb"><i style="width:77%;background:#3B82F6"></i></div><small>₹1,390 left</small></div></div>
+    <div class="row"><span class="ic ms" style="background:#FCE7F3;color:#EC4899">shopping_bag</span><div class="t"><div class="n" style="display:flex;justify-content:space-between"><span>Shopping</span><span>₹1,450 / ₹5,000</span></div><div class="pb"><i style="width:29%;background:#EC4899"></i></div><small>₹3,550 left</small></div></div>
+    <div class="row"><span class="ic ms" style="background:#CCFBF1;color:#14B8A6">school</span><div class="t"><div class="n" style="display:flex;justify-content:space-between"><span>Education</span><span>₹2,000 / ₹3,000</span></div><div class="pb"><i style="width:67%;background:#14B8A6"></i></div><small>₹1,000 left</small></div></div>
+  </div></div>
+</div>
+
+<!-- s5: excel import -->
+<div id="s5" class="view shot">
+  <div class="cap"><h2>Bring your Excel sheet</h2><p>Import your old tracker, export a backup any time</p></div>
+  <div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span class="ms">signal_cellular_alt wifi battery_full</span></div>
+    <div class="bar"><span class="ms">arrow_back</span>Import from Excel</div>
+    <div class="found"><h4>Found in your file</h4>
+      418 expenses, ₹6,84,210<br>19 income entries, ₹11,78,000<br>From 1 Sept 2022 to 29 Feb 2024<br>
+      26 exact copies inside the file will be skipped<br><span style="font-size:20px;color:#475569">Sheets read: Sep 2022, Oct 2022 … Feb 2024</span></div>
+    <div class="opt"><div style="flex:1"><h4>Credit card bills are transfers</h4><p>Paying a card bill isn't new spending (the purchases are already counted), so import them as transfers.</p></div><span class="sw"></span></div>
+    <div class="opt"><div style="flex:1"><h4>Use planned amounts as budgets</h4><p>9 categories have planned amounts in your summary sheet.</p></div><span class="sw"></span></div>
+    <div class="btn">Import 437 entries</div>
+  </div></div>
+</div>
+
+<script>
+  const id = location.hash.slice(1) || 'icon';
+  document.getElementById(id).style.display = 'block';
+</script>
+</body>
+</html>

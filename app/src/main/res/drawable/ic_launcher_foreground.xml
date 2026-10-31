@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- coins peeking out of the wallet -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M46,24 A10,10 0 1,1 46,44 A10,10 0 1,1 46,24 Z" />
+    <path
+        android:fillColor="#FFE082"
+        android:pathData="M61,29 A7.5,7.5 0 1,1 61,44 A7.5,7.5 0 1,1 61,29 Z" />
+    <!-- wallet -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,38 H75 C77.2,38 79,39.8 79,42 V70 C79,72.2 77.2,74 75,74 H33 C30.8,74 29,72.2 29,70 V42 C29,39.8 30.8,38 33,38 Z" />
+    <!-- clasp -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M64,50 H81 V62 H64 C62.3,62 61,60.7 61,59 V53 C61,51.3 62.3,50 64,50 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M67,53.5 A2.5,2.5 0 1,1 67,58.5 A2.5,2.5 0 1,1 67,53.5 Z" />
+    <!-- a line of entries -->
+    <path
+        android:strokeColor="#0D6EFD"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M36,48 H53 M36,57 H48" />
+</vector>

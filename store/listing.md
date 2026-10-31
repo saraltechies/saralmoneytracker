@@ -1,0 +1,88 @@
+# Saral Money Tracker – Google Play store listing (en-IN / en-US)
+
+Every claim below matches the code as of 1.0.0. Re-check before each release.
+
+## App name (max 30)
+Saral Money Tracker
+
+## Short description (max 80)
+Track daily expenses and income, set budgets and see where your money goes.
+
+## Full description (max 4000)
+Saral Money Tracker is a simple, private way to track your income and expenses. See what you spend today, this week and this month, keep to a budget, and never miss a salary credit, rent or EMI. Your money data stays on your phone: the app has no internet access, no account and no ads.
+
+ADD AN ENTRY IN SECONDS
+• A keypad that adds up sums for you: type 250+120+45 and save ₹415
+• Pick a category with one tap; your last used account is chosen for you
+• Today and Yesterday shortcuts, or any date
+• Notes, and search across every note and category
+
+DAILY, WEEKLY, MONTHLY AND YEARLY VIEWS
+• Switch between day, week, month, year or any date range
+• Months can follow your salary cycle, for example 25th to 24th
+• Home shows this month's spending, income and savings, plus today's and this week's spending
+
+BUDGETS THAT KEEP YOU ON TRACK
+• A monthly limit for each category
+• Warnings at 80% and when you go over
+• A safe amount you can still spend each day for the rest of the month
+
+CHARTS AND INSIGHTS
+• Donut chart by category and a trend chart over the period
+• Average per day, comparison with the previous period and your savings rate
+• Tap a category to see all its entries
+
+ACCOUNTS AND CREDIT CARDS, DONE RIGHT
+• Cash, bank accounts, credit cards and UPI wallets with live balances
+• Net worth: what you have minus what you owe
+• Paying a credit card bill or withdrawing cash is a transfer, so it's never counted as spending twice
+
+REPEATING ENTRIES
+• Add salary, rent, EMIs, SIPs and subscriptions once
+• They're recorded on their dates by themselves: daily, weekly, monthly or yearly
+
+BRING YOUR EXCEL SHEET
+• Import your old expense tracker, including monthly "Money Out / Money In" sheets
+• Also reads any table with Date and Amount columns, and bank statements with Debit and Credit columns
+• Copied rows are skipped, and importing the same file twice is safe
+• Export everything to Excel (a full backup you can import again) or CSV
+
+PRIVATE AND SECURE
+• No internet permission: your data can't leave your phone
+• No ads, no sign-up, no tracking
+• App lock with your fingerprint, face or phone PIN
+• Hide the app's content in recent apps
+• Free and open source under the GPL-3.0 licence: github.com/saraltechies/saralmoneytracker
+
+ALSO
+• 29 currencies, with Indian number format for rupees (₹1,25,000)
+• Your own categories with 47 icons and 20 colours
+• Optional daily reminder, only on days you haven't added anything
+• Light and dark themes, launcher shortcuts for Add expense, Add income and Transfer
+
+Made in India by Saral Techies (saraltechies.com).
+Questions or ideas? Write to us. We read every message.
+
+## Category
+Finance
+
+## Tags (pick up to 5 in Play Console)
+Budgeting, Personal finance, Expense tracker, Money management, Finance
+
+## Contact details
+- Website: https://saraltechies.com/
+- Email: support@saraltechies.com
+- Phone: +91 888 212 8706 (optional; shown publicly)
+
+## Privacy policy URL
+https://saraltechies.com/saralmoneytracker/privacy-policy (upload `store/privacy-policy.html` there before submitting)
+
+## Graphics (in ./graphics)
+| Asset | File | Play spec |
+| --- | --- | --- |
+| App icon | icon-512.png | 512×512 PNG |
+| Feature graphic | feature-graphic-1024x500.png | 1024×500 PNG |
+| Phone screenshots | phone-screenshot-1…5.png | 1080×1920 PNG (2–8 required) |
+
+All graphics are rendered from `graphics-src/store.html` with `sh graphics-src/render.sh` (run from this folder).
+The 1.0.0 screenshots are drawings of the app's screens. When convenient, replace them with real captures from a phone.

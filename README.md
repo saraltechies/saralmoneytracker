@@ -8,7 +8,7 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=com.saraltechies.saralmoneytracker)
 -->
 
-## Features (1.1)
+## Features (1.2)
 
 - **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), your most used categories first (with **More**
   and a search for the rest), today/yesterday chips, and
@@ -30,7 +30,12 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   simple interest on what is still owed), paid back any time or as a monthly EMI. Shows what each person still owes,
   interest due, the EMI plan with paid and late instalments, and what is overdue; a payment is split into interest and
   principal for you. Each loan has its own account, so balances and net worth stay right and only the interest counts as
-  income or spending. A reminder on the day a payment is due, and a plain-text statement to share with the person.
+  income or spending. A reminder on the day a payment is due.
+- **Contacts and PDF statements**: each loan is with a person, bank, finance company or vendor, with phone, email, address,
+  PAN/GSTIN, bank account, IFSC, UPI ID and a loan reference (name and number can be picked from the phone's contacts,
+  with no contacts permission). Add **your details** once, and send a PDF statement: both parties, terms, a summary, every
+  entry with the running balance, the EMI plan, and how to pay with a UPI scan-to-pay code. Whole loan, a financial year
+  or any dates; share it (the email is filled in for mail apps) or save it.
 - **Search** every note and category; filter by expense, income or transfer.
 - **Excel import**: bring in a hand-made tracker (monthly "Money Out / Money In" sheets), any table with Date and Amount
   columns, or a bank statement with Debit/Credit columns. Copied rows are skipped, "Credit Card" bill payments can be turned

@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.1.0. Re-check before each release.
+Every claim below matches the code as of 1.2.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -44,7 +44,9 @@ LENT AND BORROWED MONEY
 • See who owes what, interest due, the next payment and anything overdue
 • Payments are split into interest and principal for you
 • Only interest counts as income or spending; your balances stay right
-• A reminder on the day a payment is due, and a statement to share with the person
+• Full details for each person, bank or vendor: phone, email, address, PAN/GSTIN, bank and UPI
+• Send a PDF loan statement with the running balance, EMI plan and a UPI scan-to-pay code
+• A reminder on the day a payment is due
 
 REPEATING ENTRIES
 • Add salary, rent, EMIs, SIPs and subscriptions once

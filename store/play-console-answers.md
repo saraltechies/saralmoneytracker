@@ -1,7 +1,7 @@
 # Play Console answers for Saral Money Tracker
 
 Answers for every declaration in **Policy → App content**, plus the release setup.
-They match the code as of v1.4.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
+They match the code as of v1.5.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
 (the manifest removes it and the release workflow fails if it appears).
 **Re-check them whenever you add an SDK or a permission.**
 
@@ -71,9 +71,22 @@ The app does not use SMS, call log, location, contacts or all-files access.
 - Play App Signing: **use Google-generated app signing key**. Upload `app-release.aab`, signed with our upload key `saralmoneytracker-upload`.
 - Upload key SHA-256 (for reference):
   `C6:3B:B0:55:85:E0:D3:84:DF:58:25:64:36:B6:28:06:C0:25:33:6B:3B:23:56:4A:C6:57:B8:C0:14:1C:A1:FA`
+- Native debug symbols warning: expected and harmless. The only native code is two small AndroidX libraries
+  (graphics path, DataStore) that Google ships already stripped, so there are no symbols to upload.
 - Deobfuscation file: nothing to do. The build puts `mapping.txt` inside the AAB and Play picks it up (App bundle
   explorer → Downloads shows it as "ReTrace mapping file").
-- Release name: `1.4.0 (5)` (earlier: `1.3.0 (4)`, `1.2.0 (3)`, `1.1.0 (2)`, `1.0.0 (1)`)
+- Release name: `1.5.0 (6)` (earlier: `1.4.0 (5)`, `1.3.0 (4)`, `1.2.0 (3)`, `1.1.0 (2)`, `1.0.0 (1)`)
+- Release notes for 1.5.0 (en-IN):
+  ```
+  <en-IN>
+  New: automatic backup, daily or weekly, to a folder you choose such as Google Drive.
+  • Quick setup for new users: personal, business or both
+  • What's new: a tour of everything added since the first version
+  • Undo after deleting a loan or credit ledger entry
+  • Search now finds customers, suppliers, loans and accounts by name
+  • Fixes: restoring a backup keeps every entry; widget resets at midnight
+  </en-IN>
+  ```
 - Release notes for 1.4.0 (en-IN):
   ```
   <en-IN>

@@ -731,6 +731,64 @@
     <string name="txn_party_received">Payment from %1$s</string>
     <string name="txn_party_paid">Paid to %1$s</string>
 
+    <!-- Automatic backup -->
+    <string name="done">Done</string>
+    <string name="backup_title">Automatic backup</string>
+    <string name="backup_intro">Saves a full backup (an Excel file) into a folder you choose, and keeps the newest %1$d. Pick a Google Drive folder to keep a copy off this phone; the Drive app uploads it.</string>
+    <string name="backup_folder">Folder</string>
+    <string name="backup_choose_folder">Choose a folder</string>
+    <string name="backup_folder_missing">The folder can\'t be reached. Choose it again.</string>
+    <string name="backup_how_often">How often</string>
+    <string name="backup_off">Off</string>
+    <string name="backup_daily">Daily</string>
+    <string name="backup_weekly">Weekly</string>
+    <string name="backup_now">Back up now</string>
+    <string name="backup_done">Backup saved</string>
+    <string name="backup_failed">Couldn\'t save the backup. Check the folder and try again.</string>
+    <string name="backup_restore_hint">To restore, use Settings → Import from Excel and pick a backup file.</string>
+    <string name="backup_status_off">Off. Your data is only on this phone.</string>
+    <string name="backup_status_failed">The last backup failed. Tap to check the folder.</string>
+    <string name="backup_status_last">%1$s · last backup %2$s</string>
+    <string name="backup_status_pending">On · the first backup runs tonight</string>
+    <string name="error_account_name_taken">You already have an account with this name</string>
+
+    <!-- First start -->
+    <string name="setup_title">Welcome to Saral Money Tracker</string>
+    <string name="setup_subtitle">Two quick questions to set things up. You can change everything later in Settings.</string>
+    <string name="setup_question">What will you track?</string>
+    <string name="setup_personal">My own money</string>
+    <string name="setup_personal_hint">Income, expenses, budgets, loans and savings</string>
+    <string name="setup_business">My business</string>
+    <string name="setup_business_hint">A shop or business: sales, purchases, customers on credit, profit and loss</string>
+    <string name="setup_both">Both, kept apart</string>
+    <string name="setup_both_hint">Separate books for personal and business money, in one app</string>
+    <string name="setup_backup_hint">Back up every week to a folder you choose, such as Google Drive, so a lost phone doesn\'t mean lost records.</string>
+    <string name="setup_backup_pick">Choose a backup folder</string>
+    <string name="setup_backup_on">Weekly backup is on</string>
+    <string name="setup_backup_skip">Remove</string>
+    <string name="setup_start">Start</string>
+
+    <!-- What's new -->
+    <string name="whatsnew_title">What\'s new</string>
+    <string name="whatsnew_subtitle">A lot has arrived since the first version. Here\'s what you can do now.</string>
+    <string name="whatsnew_settings_summary">Everything new since the first version</string>
+    <string name="whatsnew_got_it">Got it</string>
+    <string name="whatsnew_open">Open</string>
+    <string name="whatsnew_backup_title">Automatic backup</string>
+    <string name="whatsnew_backup_text">Daily or weekly backups to a folder you choose, such as Google Drive.</string>
+    <string name="whatsnew_backup_action">Turn on backup</string>
+    <string name="whatsnew_books_title">Personal and business books</string>
+    <string name="whatsnew_books_text">Keep a shop or business apart from your own money, with a profit and loss report.</string>
+    <string name="whatsnew_books_action">Add a business</string>
+    <string name="whatsnew_ledger_title">Credit ledger</string>
+    <string name="whatsnew_ledger_text">Customers and suppliers on credit: You gave, You got, and payment reminders on WhatsApp.</string>
+    <string name="whatsnew_loans_title">Lent and borrowed</string>
+    <string name="whatsnew_loans_text">Money lent or borrowed, on credit or interest, with EMI plans and due-date reminders.</string>
+    <string name="whatsnew_pdf_title">PDF statements</string>
+    <string name="whatsnew_pdf_text">Send loan and account statements with a UPI scan-to-pay code. Add Your details in Settings first.</string>
+    <string name="whatsnew_widget_title">Widget and quick add</string>
+    <string name="whatsnew_widget_text">Add the "Today\'s spending" widget to your home screen, or the Add expense tile to quick settings.</string>
+
     <string-array name="default_business_expense_categories">
         <item>Purchases &amp; Stock</item>
         <item>Rent</item>

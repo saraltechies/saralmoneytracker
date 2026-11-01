@@ -59,6 +59,11 @@
         </receiver>
 
 
+        <!-- Automatic backup to a folder the person picked. -->
+        <receiver
+            android:name=".util.BackupReceiver"
+            android:exported="false" />
+
         <!-- Home-screen widget: today's and this month's spending, Add expense / Add income. -->
         <receiver
             android:name=".util.MoneyWidget"

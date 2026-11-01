@@ -458,5 +458,8 @@ object SpreadsheetImport {
     }
 
     fun key(r: ImportedRow): String =
-        listOf(r.type, r.date, r.amount, r.category.lowercase(Locale.ROOT), r.note.lowercase(Locale.ROOT), r.book.orEmpty().lowercase(Locale.ROOT)).joinToString("|")
+        listOf(
+            r.type, r.date, r.amount, r.category.lowercase(Locale.ROOT), r.note.lowercase(Locale.ROOT), r.book.orEmpty().lowercase(Locale.ROOT),
+            r.account.orEmpty().lowercase(Locale.ROOT), r.toAccount.orEmpty().lowercase(Locale.ROOT),
+        ).joinToString("|")
 }

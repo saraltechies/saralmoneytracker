@@ -283,6 +283,26 @@ class SpreadsheetImportTest {
     }
 
     @Test
+    fun samePaymentToTwoPeopleIsNotACopy() {
+        // ₹500 paid to two suppliers on the same day: two real entries, not one copied twice.
+        val accounts = listOf(
+            Account(id = 1, name = "Cash", type = AccountType.CASH),
+            Account(id = 7, name = "Gupta", type = AccountType.PARTY),
+            Account(id = 8, name = "Verma", type = AccountType.PARTY),
+        )
+        val txns = listOf(
+            Txn(type = TxnType.TRANSFER, amount = 50_000, date = d("2026-11-03"), categoryId = null, accountId = 1, toAccountId = 7),
+            Txn(type = TxnType.TRANSFER, amount = 50_000, date = d("2026-11-03"), categoryId = null, accountId = 1, toAccountId = 8),
+        )
+        val out = ByteArrayOutputStream()
+        BackupFormat.writeXlsx(BackupFormat.Data(accounts, emptyList(), txns, emptyList()), out, d("2026-11-10"), "1.5.0")
+        val result = SpreadsheetImport.read(XlsxReader.read(ByteArrayInputStream(out.toByteArray())))
+        assertEquals(2, result.rows.size)
+        assertEquals(0, result.duplicatesInFile)
+        assertEquals(setOf("Gupta", "Verma"), result.rows.map { it.toAccount }.toSet())
+    }
+
+    @Test
     fun textDatesAndAmounts() {
         assertEquals(d("2026-10-05"), SpreadsheetImport.date(XCell("05/10/2026", null)))
         assertEquals(d("2026-10-25"), SpreadsheetImport.date(XCell("10/25/2026", null)))

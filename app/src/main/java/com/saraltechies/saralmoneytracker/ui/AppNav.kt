@@ -7,7 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
@@ -48,6 +50,10 @@ import com.saraltechies.saralmoneytracker.ui.loans.LoanEditScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoansScreen
 import com.saraltechies.saralmoneytracker.ui.recurring.RecurringScreen
 import com.saraltechies.saralmoneytracker.ui.settings.SettingsScreen
+import com.saraltechies.saralmoneytracker.ui.setup.SetupScreen
+import com.saraltechies.saralmoneytracker.ui.setup.WHATS_NEW_VERSION
+import com.saraltechies.saralmoneytracker.ui.setup.WhatsNewSheet
+import com.saraltechies.saralmoneytracker.ui.setup.WhatsNewTarget
 import com.saraltechies.saralmoneytracker.ui.stats.StatsScreen
 import com.saraltechies.saralmoneytracker.ui.txns.TransactionsScreen
 import com.saraltechies.saralmoneytracker.util.AppShortcuts
@@ -58,7 +64,10 @@ private object Routes {
     const val SEARCH = "search"
     const val ACCOUNT = "account/{id}"
     const val CATEGORY = "category/{id}"
-    const val SETTINGS = "settings"
+    const val SETTINGS = "settings?backup={backup}"
+    const val SETUP = "setup"
+
+    fun settings(backup: Boolean = false) = "settings?backup=$backup"
     const val CATEGORIES = "categories"
     const val RECURRING = "recurring"
     const val IMPORT = "import"
@@ -117,6 +126,44 @@ fun AppNav(
     val bookState = BookState(books, currentBook)
     val selectBook: (Long) -> Unit = { id -> appScope.launch { settings.setBook(id) } }
 
+
+    // First start: a short setup. Someone updating with data already skips it and sees what's new instead.
+    LaunchedEffect(prefs.setupDone) {
+        if (prefs.setupDone) return@LaunchedEffect
+        val hasData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            repository.txnCount(Books.ALL) > 0 || repository.books().size > 1 || repository.loans(Books.ALL).isNotEmpty() || repository.parties(Books.ALL).isNotEmpty()
+        }
+        if (hasData) {
+            settings.setSetupDone()
+        } else {
+            settings.setWhatsNewSeen(WHATS_NEW_VERSION)
+            nav.navigate(Routes.SETUP) { launchSingleTop = true }
+        }
+    }
+    var showWhatsNew by remember { mutableStateOf(false) }
+    var whatsNewClosed by remember { mutableStateOf(false) }
+    val whatsNewDue = prefs.setupDone && prefs.whatsNewSeen < WHATS_NEW_VERSION
+    if (showWhatsNew || (whatsNewDue && !whatsNewClosed)) {
+        val close = {
+            showWhatsNew = false
+            whatsNewClosed = true
+            appScope.launch { settings.setWhatsNewSeen(WHATS_NEW_VERSION) }
+            Unit
+        }
+        WhatsNewSheet(
+            onOpen = { target ->
+                close()
+                when (target) {
+                    WhatsNewTarget.BOOKS -> nav.navigate(Routes.BOOKS)
+                    WhatsNewTarget.LEDGER -> nav.navigate(Routes.LEDGER)
+                    WhatsNewTarget.LOANS -> nav.navigate(Routes.LOANS)
+                    WhatsNewTarget.BACKUP -> nav.navigate(Routes.settings(backup = true))
+                    WhatsNewTarget.NONE -> Unit
+                }
+            },
+            onDismiss = close,
+        )
+    }
     CompositionLocalProvider(LocalCurrency provides prefs.currency, LocalPeriodPrefs provides prefs.period, LocalBooks provides bookState) {
         NavHost(nav, startDestination = MainTab.HOME.route) {
             composable(MainTab.HOME.route) {
@@ -134,7 +181,7 @@ fun AppNav(
                     onOpenStats = { nav.openTab(MainTab.STATS) },
                     onOpenAccounts = { nav.openTab(MainTab.ACCOUNTS) },
                     onOpenRecurring = { nav.navigate(Routes.edit(rule = it)) },
-                    onOpenSettings = { nav.navigate(Routes.SETTINGS) },
+                    onOpenSettings = { nav.navigate(Routes.settings()) },
                     onImport = { nav.navigate(Routes.IMPORT) },
                     onOpenLoans = { nav.navigate(Routes.LOANS) },
                     onOpenLedger = { nav.navigate(Routes.LEDGER) },
@@ -243,8 +290,10 @@ fun AppNav(
                     },
                 )
             }
-            composable(Routes.SETTINGS) {
+            composable(Routes.SETTINGS, arguments = listOf(navArgument("backup") { type = NavType.BoolType; defaultValue = false })) { entry ->
                 SettingsScreen(
+                    openBackup = entry.arguments?.getBoolean("backup") == true,
+                    onWhatsNew = { showWhatsNew = true },
                     repository = repository,
                     settings = settings,
                     prefs = prefs,
@@ -267,6 +316,9 @@ fun AppNav(
                     onOpen = { nav.navigate(Routes.edit(rule = it)) },
                     onAdd = { nav.navigate(Routes.edit(rule = NEW_RULE)) },
                 )
+            }
+            composable(Routes.SETUP) {
+                SetupScreen(repository, settings, onDone = { nav.popBackStack() })
             }
             composable(Routes.MY_DETAILS) { MyDetailsScreen(repository, onBack = { nav.popBackStack() }) }
             composable(Routes.BOOKS) { BooksScreen(repository, snackbar, onBack = { nav.popBackStack() }, onSelect = selectBook) }

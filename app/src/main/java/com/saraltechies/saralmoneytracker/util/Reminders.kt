@@ -140,6 +140,7 @@ class RescheduleReceiver : BroadcastReceiver() {
                 val prefs = app.settings.current()
                 Reminders.schedule(context, prefs.reminderOn, prefs.reminderMinute)
                 Widgets.refreshNow(context)
+                AutoBackup.schedule(context, prefs.backupFrequency != com.saraltechies.saralmoneytracker.data.BackupFrequency.OFF && prefs.backupFolder != null)
             } finally {
                 pending.finish()
             }

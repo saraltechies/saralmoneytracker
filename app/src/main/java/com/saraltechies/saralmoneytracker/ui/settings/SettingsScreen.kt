@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Store
@@ -95,7 +97,7 @@ import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.util.Locale
 
-private enum class Picker { CURRENCY, THEME, WEEK, MONTH, TIME, DELETE }
+private enum class Picker { CURRENCY, THEME, WEEK, MONTH, TIME, DELETE, BACKUP }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,12 +112,14 @@ fun SettingsScreen(
     onLoans: () -> Unit,
     onBooks: () -> Unit,
     onLedger: () -> Unit,
+    openBackup: Boolean = false,
+    onWhatsNew: () -> Unit = {},
     onRecurring: () -> Unit,
     onImport: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var picker by remember { mutableStateOf<Picker?>(null) }
+    var picker by remember { mutableStateOf(if (openBackup) Picker.BACKUP else null) }
     val lockAvailable = remember { AppLock.available(context) }
 
     fun notify(message: Int) {
@@ -218,6 +222,7 @@ fun SettingsScreen(
             item { Setting(Icons.Filled.Security, stringResource(R.string.privacy_promise), stringResource(R.string.privacy_promise_text), onClick = null) }
 
             item { SectionTitle(stringResource(R.string.settings_data)) }
+            item { Setting(Icons.Filled.Backup, stringResource(R.string.backup_title), backupStatus(prefs)) { picker = Picker.BACKUP } }
             item { Setting(Icons.Filled.Upload, stringResource(R.string.import_excel), stringResource(R.string.import_excel_summary), onClick = onImport) }
             item {
                 Setting(Icons.Filled.TableChart, stringResource(R.string.export_excel), stringResource(R.string.export_excel_summary)) {
@@ -232,6 +237,7 @@ fun SettingsScreen(
             item { Setting(Icons.Filled.DeleteForever, stringResource(R.string.delete_all), stringResource(R.string.delete_all_summary)) { picker = Picker.DELETE } }
 
             item { SectionTitle(stringResource(R.string.settings_about)) }
+            item { Setting(Icons.Filled.NewReleases, stringResource(R.string.whatsnew_title), stringResource(R.string.whatsnew_settings_summary), onClick = onWhatsNew) }
             item { Setting(Icons.Filled.Star, stringResource(R.string.rate_app), stringResource(R.string.rate_app_summary)) { PlayStore.openListing(context, PlayStore.ownPackage(context)) } }
             item {
                 Setting(Icons.Filled.Share, stringResource(R.string.share_app), stringResource(R.string.share_app_summary)) {
@@ -295,6 +301,7 @@ fun SettingsScreen(
                 dismissButton = { TextButton(onClick = { picker = null }) { Text(stringResource(R.string.cancel)) } },
             )
         }
+        Picker.BACKUP -> BackupDialog(settings, prefs, onDismiss = { picker = null })
         Picker.DELETE -> DeleteAllDialog(
             onConfirm = {
                 scope.launch {

@@ -15,5 +15,7 @@ class SaralMoneyTrackerApp : Application() {
         super.onCreate()
         Reminders.createChannel(this)
         Thread { StatementFiles.clearOld(this) }.start()
+        // A backup the nightly alarm missed (some phones hold alarms back) runs now.
+        com.saraltechies.saralmoneytracker.util.AutoBackup.catchUp(this)
     }
 }

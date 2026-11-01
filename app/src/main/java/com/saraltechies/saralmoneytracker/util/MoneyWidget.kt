@@ -89,6 +89,7 @@ object Widgets {
         views.setOnClickPendingIntent(R.id.widget_add_expense, open(app, AppShortcuts.ID_EXPENSE, 1))
         views.setOnClickPendingIntent(R.id.widget_add_income, open(app, AppShortcuts.ID_INCOME, 2))
         manager.updateAppWidget(ids, views)
+        scheduleMidnight(app, ids)
     }
 
     /** Opens the app, or straight into a new expense or income. */
@@ -116,4 +117,16 @@ class AddExpenseTile : TileService() {
             )
         }
     }
+}
+
+/** "Spent today" must change at midnight, not up to half an hour later: wake the widget just after the day turns. */
+private fun scheduleMidnight(context: Context, ids: IntArray) {
+    val alarms = context.getSystemService(android.app.AlarmManager::class.java) ?: return
+    val intent = Intent(context, MoneyWidget::class.java)
+        .setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE)
+        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+    val pending = PendingIntent.getBroadcast(context, 200, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    val next = LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() + 30_000
+    // A five-minute window needs no exact-alarm permission and still lands right after midnight.
+    runCatching { alarms.setWindow(android.app.AlarmManager.RTC, next, 5 * 60_000L, pending) }
 }

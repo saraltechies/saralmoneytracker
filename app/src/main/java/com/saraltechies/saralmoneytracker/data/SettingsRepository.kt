@@ -23,6 +23,8 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+enum class BackupFrequency(val days: Int) { OFF(0), DAILY(1), WEEKLY(7) }
+
 data class AppPrefs(
     val currency: CurrencyInfo,
     val period: PeriodPrefs,
@@ -35,6 +37,16 @@ data class AppPrefs(
     val welcomeDismissed: Boolean,
     /** The book on screen: a book id, or 0 for all books. */
     val book: Long = 0,
+    /** Automatic backup: the folder (a document tree the person picked) and how often. */
+    val backupFolder: String? = null,
+    val backupFrequency: BackupFrequency = BackupFrequency.OFF,
+    val lastBackupAt: Long = 0,
+    /** Why the last automatic backup failed, if it did. */
+    val lastBackupError: String? = null,
+    /** First-run setup finished (or skipped because there was data already). */
+    val setupDone: Boolean = false,
+    /** The "What's new" version last shown. */
+    val whatsNewSeen: Int = 0,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -49,6 +61,12 @@ class SettingsRepository(private val context: Context) {
     private val reminderMinuteKey = intPreferencesKey("reminder_minute")
     private val welcomeDismissedKey = booleanPreferencesKey("welcome_dismissed")
     private val bookKey = longPreferencesKey("book")
+    private val backupFolderKey = stringPreferencesKey("backup_folder")
+    private val backupFrequencyKey = stringPreferencesKey("backup_frequency")
+    private val lastBackupAtKey = longPreferencesKey("last_backup_at")
+    private val lastBackupErrorKey = stringPreferencesKey("last_backup_error")
+    private val setupDoneKey = booleanPreferencesKey("setup_done")
+    private val whatsNewSeenKey = intPreferencesKey("whats_new_seen")
     private val goodMomentsKey = intPreferencesKey("good_moments")
     private val reviewPromptsKey = intPreferencesKey("review_prompts")
     private val reviewLastAtKey = longPreferencesKey("review_last_at")
@@ -69,6 +87,12 @@ class SettingsRepository(private val context: Context) {
             reminderMinute = p[reminderMinuteKey] ?: DEFAULT_REMINDER_MINUTE,
             welcomeDismissed = p[welcomeDismissedKey] ?: false,
             book = p[bookKey] ?: 0L,
+            backupFolder = p[backupFolderKey],
+            backupFrequency = BackupFrequency.entries.firstOrNull { it.name == p[backupFrequencyKey] } ?: BackupFrequency.OFF,
+            lastBackupAt = p[lastBackupAtKey] ?: 0L,
+            lastBackupError = p[lastBackupErrorKey],
+            setupDone = p[setupDoneKey] ?: false,
+            whatsNewSeen = p[whatsNewSeenKey] ?: 0,
         )
     }.distinctUntilChanged()
 
@@ -81,6 +105,23 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAppLock(on: Boolean) = context.dataStore.edit { it[appLockKey] = on }
     suspend fun setHideInRecents(on: Boolean) = context.dataStore.edit { it[hideRecentsKey] = on }
     suspend fun setWelcomeDismissed() = context.dataStore.edit { it[welcomeDismissedKey] = true }
+
+    suspend fun setBackup(folder: String?, frequency: BackupFrequency) = context.dataStore.edit {
+        if (folder != null) it[backupFolderKey] = folder else it.remove(backupFolderKey)
+        it[backupFrequencyKey] = frequency.name
+    }
+
+    suspend fun recordBackup(atMs: Long, error: String?) = context.dataStore.edit {
+        if (error == null) {
+            it[lastBackupAtKey] = atMs
+            it.remove(lastBackupErrorKey)
+        } else {
+            it[lastBackupErrorKey] = error
+        }
+    }
+
+    suspend fun setSetupDone() = context.dataStore.edit { it[setupDoneKey] = true }
+    suspend fun setWhatsNewSeen(version: Int) = context.dataStore.edit { it[whatsNewSeenKey] = version }
     suspend fun setBook(id: Long) {
         context.dataStore.edit { it[bookKey] = id }
         com.saraltechies.saralmoneytracker.util.Widgets.requestUpdate(context)

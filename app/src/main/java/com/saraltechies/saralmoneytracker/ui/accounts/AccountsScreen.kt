@@ -59,6 +59,7 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.ui.components.BookChips
@@ -89,6 +90,8 @@ fun AccountsScreen(
     val data by remember { repository.watch { Triple(repository.accounts(includeArchived = true, includeLoans = true), repository.balances(), repository.loanItems()) } }
         .collectAsStateWithLifecycle(null)
     val parties by remember { repository.watch { repository.partyItems() } }.collectAsStateWithLifecycle(emptyList())
+    val allNames by remember { repository.watch { repository.accounts(includeArchived = true, includeLoans = true, book = Books.ALL).map { it.id to it.name } } }
+        .collectAsStateWithLifecycle(emptyList())
     val bookState = LocalBooks.current
     var editing by remember { mutableStateOf<Account?>(null) }
 
@@ -217,6 +220,8 @@ fun AccountsScreen(
     editing?.let { account ->
         AccountDialog(
             account = account,
+            // Names are unique across all books, so a backup restores every entry to the right account.
+            takenNames = allNames.filter { it.first != account.id }.map { it.second.trim().lowercase() }.toSet(),
             onDismiss = { editing = null },
             onSave = { scope.launch { repository.saveAccount(it) } },
             onRemove = {
@@ -245,11 +250,12 @@ private fun AccountRow(account: Account, balance: Long, onClick: () -> Unit, onE
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Account) -> Unit, onRemove: () -> Unit) {
+private fun AccountDialog(account: Account, takenNames: Set<String>, onDismiss: () -> Unit, onSave: (Account) -> Unit, onRemove: () -> Unit) {
     val currency = LocalCurrency.current
     var name by remember { mutableStateOf(account.name) }
     var type by remember { mutableStateOf(account.type) }
     var bookId by remember { mutableStateOf(account.bookId) }
+    val nameTaken = name.trim().lowercase() in takenNames
     var opening by remember { mutableStateOf(if (account.opening == 0L) "" else Money.plain(account.opening)) }
     val openingValue = if (opening.isBlank()) 0L else Money.parse(opening)
     val isNew = account.id == 0L
@@ -260,6 +266,8 @@ private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Acco
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name, onValueChange = { name = it.take(40) }, label = { Text(stringResource(R.string.name)) }, singleLine = true,
+                    isError = nameTaken,
+                    supportingText = if (nameTaken) ({ Text(stringResource(R.string.error_account_name_taken)) }) else null,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                 )
                 BookChips(bookId, onSelect = { bookId = it }, modifier = Modifier.fillMaxWidth())
@@ -285,7 +293,7 @@ private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Acco
         },
         confirmButton = {
             TextButton(
-                enabled = name.isNotBlank() && openingValue != null,
+                enabled = name.isNotBlank() && openingValue != null && !nameTaken,
                 onClick = { onSave(account.copy(name = name.trim(), type = type, opening = openingValue ?: 0, bookId = bookId)); onDismiss() },
             ) { Text(stringResource(R.string.save)) }
         },

@@ -263,7 +263,11 @@ class MoneyRepository(private val context: Context) {
         if (!query.isNullOrBlank()) {
             val q = query.trim()
             val catIds = categories(includeArchived = true, book = Books.ALL).filter { it.name.contains(q, ignoreCase = true) }.map { it.id }
-            val catClause = if (catIds.isEmpty()) "" else " OR category_id IN (${catIds.joinToString(",")})"
+            // Also the name of an account, customer, supplier or loan, so "Ramesh" finds everything with Ramesh.
+            val accIds = accounts(includeArchived = true, includeLoans = true, book = Books.ALL).filter { it.name.contains(q, ignoreCase = true) }.map { it.id }
+            val accList = accIds.joinToString(",")
+            val catClause = (if (catIds.isEmpty()) "" else " OR category_id IN (${catIds.joinToString(",")})") +
+                (if (accIds.isEmpty()) "" else " OR account_id IN ($accList) OR to_account_id IN ($accList)")
             where += "(note LIKE ? ESCAPE '\\'$catClause)"
             args += "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         }
@@ -759,7 +763,8 @@ class MoneyRepository(private val context: Context) {
         }
 
         fun account(name: String, type: AccountType? = null, opening: Long = 0, archived: Boolean = false, book: Long = options.bookId): Long {
-            accounts.firstOrNull { key(it.name) == key(name) }?.let { return it.id }
+            // Two books can each have a "Cash": prefer the one in the book the row belongs to.
+            (accounts.firstOrNull { key(it.name) == key(name) && it.bookId == book } ?: accounts.firstOrNull { key(it.name) == key(name) })?.let { return it.id }
             val a = Account(name = name.trim(), type = type ?: guessAccountType(name), opening = opening, archived = archived, sort = accounts.size, bookId = book)
             val id = w.insert(T_ACCOUNTS, null, MoneyDb.values(a))
             accounts += a.copy(id = id)
@@ -843,9 +848,11 @@ class MoneyRepository(private val context: Context) {
 
         // Existing entries, to skip rows imported before.
         val existing = HashSet<String>()
-        w.rawQuery("SELECT type, day, amount, category_id, note FROM $T_TXNS", null).use { c ->
+        w.rawQuery("SELECT type, day, amount, category_id, note, account_id, to_account_id FROM $T_TXNS", null).use { c ->
             while (c.moveToNext()) {
-                existing += listOf(c.getString(0), c.getLong(1), c.getLong(2), if (c.isNull(3)) "" else c.getLong(3), key(c.getString(4) ?: "")).joinToString("|")
+                existing += listOf(
+                    c.getString(0), c.getLong(1), c.getLong(2), if (c.isNull(3)) "" else c.getLong(3), key(c.getString(4) ?: ""), c.getLong(5), if (c.isNull(6)) "" else c.getLong(6),
+                ).joinToString("|")
             }
         }
 
@@ -854,7 +861,7 @@ class MoneyRepository(private val context: Context) {
         var transfers = 0
         var cardAccount: Long? = null
         for (row in result.rows) {
-            val from = row.account?.let { account(it) } ?: options.defaultAccountId
+            val from = row.account?.let { account(it, book = bookOf(row.book)) } ?: options.defaultAccountId
             val txn = when {
                 row.type == TxnType.EXPENSE && key(row.category) in cardNames -> {
                     val card = cardAccount ?: accounts.firstOrNull { it.type == AccountType.CARD && !it.archived }?.id
@@ -864,12 +871,13 @@ class MoneyRepository(private val context: Context) {
                     Txn(type = TxnType.TRANSFER, amount = row.amount, date = row.date, categoryId = null, accountId = from, toAccountId = card, note = row.note)
                 }
                 row.type == TxnType.TRANSFER -> {
-                    val to = row.toAccount?.let { account(it) } ?: continue
+                    val to = row.toAccount?.let { account(it, book = bookOf(row.book)) } ?: continue
                     Txn(type = TxnType.TRANSFER, amount = row.amount, date = row.date, categoryId = null, accountId = from, toAccountId = to, note = row.note, loanId = loanOf(row, from, to))
                 }
                 else -> Txn(type = row.type, amount = row.amount, date = row.date, categoryId = category(row.category, row.type, book = bookOf(row.book)), accountId = from, note = row.note, loanId = row.loan?.let { loanIds[key(it)] })
             }
-            val k = listOf(txn.type.name, txn.date.toEpochDay(), txn.amount, txn.categoryId ?: "", key(txn.note)).joinToString("|")
+            // Accounts are part of the key: the same amount on the same day can be two real payments (say, to two people).
+            val k = listOf(txn.type.name, txn.date.toEpochDay(), txn.amount, txn.categoryId ?: "", key(txn.note), txn.accountId, txn.toAccountId ?: "").joinToString("|")
             if (!existing.add(k)) {
                 duplicates++
                 continue
@@ -885,8 +893,8 @@ class MoneyRepository(private val context: Context) {
             val rule = Recurring(
                 type = r.type, amount = r.amount,
                 categoryId = if (r.type == TxnType.TRANSFER) null else category(r.category, r.type, book = bookOf(r.book)),
-                accountId = r.account?.let { account(it) } ?: options.defaultAccountId,
-                toAccountId = r.toAccount?.let { account(it) },
+                accountId = r.account?.let { account(it, book = bookOf(r.book)) } ?: options.defaultAccountId,
+                toAccountId = r.toAccount?.let { account(it, book = bookOf(r.book)) },
                 note = r.note, frequency = r.frequency, startDate = r.startDate, nextDate = r.nextDate, endDate = r.endDate, active = r.active,
             )
             if (existingRules.any { it.copy(id = 0) == rule }) continue

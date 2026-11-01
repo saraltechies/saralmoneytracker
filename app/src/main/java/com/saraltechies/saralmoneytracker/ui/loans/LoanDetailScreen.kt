@@ -54,6 +54,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -130,11 +134,13 @@ fun LoanDetailScreen(
     var entry by remember { mutableStateOf<EntryMode?>(null) }
     var showPlan by rememberSaveable { mutableStateOf(false) }
     var statement by rememberSaveable { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
     // Your details for the loan's book: a business loan's statement shows the business.
     val me by remember { repository.watch { repository.loanItem(loanId)?.let { repository.myDetails(it.loan.bookId) } } }.collectAsStateWithLifecycle(null)
     val currency = LocalCurrency.current
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text(item?.name.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -327,7 +333,18 @@ fun LoanDetailScreen(
                 },
                 onDelete = { event ->
                     scope.launch {
-                        if (event.txnId == null) repository.setLoanOpening(current.loan, 0) else repository.deleteTxn(event.txnId)
+                        // Deleted entries can be brought back from the snackbar, like everywhere else.
+                        val undo: suspend () -> Unit = if (event.txnId == null) {
+                            val before = event.amount
+                            repository.setLoanOpening(current.loan, 0)
+                            suspend { repository.setLoanOpening(current.loan, before) }
+                        } else {
+                            val txn = current.txns.firstOrNull { it.id == event.txnId }
+                            repository.deleteTxn(event.txnId)
+                            suspend { txn?.let { repository.restoreTxn(it) }; Unit }
+                        }
+                        val result = snackbar.showSnackbar(context.getString(R.string.entry_deleted), actionLabel = context.getString(R.string.undo), duration = SnackbarDuration.Short)
+                        if (result == SnackbarResult.ActionPerformed) undo()
                     }
                 },
             )

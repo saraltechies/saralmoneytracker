@@ -91,6 +91,7 @@ fun SetupScreen(repository: MoneyRepository, settings: SettingsRepository, onDon
             backupFolder?.let {
                 settings.setBackup(it, BackupFrequency.WEEKLY)
                 AutoBackup.schedule(context, true)
+                AutoBackup.catchUp(context) // The first backup now: it makes the app's folder there.
             }
             settings.setSetupDone()
             onDone()

@@ -41,4 +41,24 @@ class AutoBackupTest {
         assertFalse(AutoBackup.isDue(prefs(BackupFrequency.OFF, 0), now))
         assertFalse(AutoBackup.isDue(prefs(BackupFrequency.DAILY, 0, folder = null), now))
     }
+
+    @Test
+    fun ownFolderUnlessThePickedOneIsForBackups() {
+        // My Drive or the phone's main storage: the app keeps its own folder there.
+        assertFalse(AutoBackup.usePickedFolder("My Drive", hasOurBackups = false))
+        assertFalse(AutoBackup.usePickedFolder("Documents", hasOurBackups = false))
+        assertFalse(AutoBackup.usePickedFolder(null, hasOurBackups = false))
+        // A folder made for backups, or one that already holds ours (people updating from 1.5 and 1.6).
+        assertTrue(AutoBackup.usePickedFolder("Backups", hasOurBackups = false))
+        assertTrue(AutoBackup.usePickedFolder(AutoBackup.FOLDER, hasOurBackups = false))
+        assertTrue(AutoBackup.usePickedFolder("Money", hasOurBackups = false))
+        assertTrue(AutoBackup.usePickedFolder("My Drive", hasOurBackups = true))
+    }
+
+    @Test
+    fun onlyOurFilesCountAsBackups() {
+        assertTrue(AutoBackup.isBackupFile(AutoBackup.PREFIX + "2026-11-01 0230.xlsx"))
+        assertFalse(AutoBackup.isBackupFile("Expense-Income Tracker.xlsx"))
+        assertFalse(AutoBackup.isBackupFile(AutoBackup.PREFIX + "2026-11-01 0230.csv"))
+    }
 }

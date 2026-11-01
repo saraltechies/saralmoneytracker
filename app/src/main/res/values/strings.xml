@@ -734,7 +734,9 @@
     <!-- Automatic backup -->
     <string name="done">Done</string>
     <string name="backup_title">Automatic backup</string>
-    <string name="backup_intro">Saves a full backup (an Excel file) into a folder you choose, and keeps the newest %1$d. Pick a Google Drive folder to keep a copy off this phone; the Drive app uploads it.</string>
+    <string name="backup_intro">Saves a full backup (an Excel file) into a folder you choose, and keeps the newest %1$d. Choose Google Drive to keep a copy off this phone; the Drive app uploads it.</string>
+    <string name="backup_drive_hint">No need to make a folder first: pick My Drive (or any folder) and the app keeps its backups in its own “Saral Money Tracker backups” folder there.</string>
+    <string name="backup_saved_in">Backup saved in %1$s</string>
     <string name="backup_folder">Folder</string>
     <string name="backup_choose_folder">Choose a folder</string>
     <string name="backup_folder_missing">The folder can\'t be reached. Choose it again.</string>
@@ -762,7 +764,7 @@
     <string name="setup_business_hint">A shop or business: sales, purchases, customers on credit, profit and loss</string>
     <string name="setup_both">Both, kept apart</string>
     <string name="setup_both_hint">Separate books for personal and business money, in one app</string>
-    <string name="setup_backup_hint">Back up every week to a folder you choose, such as Google Drive, so a lost phone doesn\'t mean lost records.</string>
+    <string name="setup_backup_hint">Back up every week to Google Drive or a folder on this phone, so a lost phone doesn\'t mean lost records. Just pick My Drive: the app makes its own folder there.</string>
     <string name="setup_backup_pick">Choose a backup folder</string>
     <string name="setup_backup_on">Weekly backup is on</string>
     <string name="setup_backup_skip">Remove</string>

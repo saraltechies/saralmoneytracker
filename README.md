@@ -57,7 +57,9 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   columns, or a bank statement with Debit/Credit columns. Copied rows are skipped, "Credit Card" bill payments can be turned
   into transfers, and a summary sheet's planned amounts can become budgets. Importing the same file twice is safe.
 - **Excel export** that doubles as a full backup (accounts, categories with budgets, repeating entries, loans, every entry), and CSV.
-- **Automatic backup**, daily or weekly, into a folder you pick (on the phone or a Google Drive folder), keeping the newest 7.
+- **Automatic backup**, daily or weekly, into a folder you pick (on the phone or Google Drive), keeping the newest 7. Pick
+  My Drive or any general folder and the app keeps its own "Saral Money Tracker backups" folder there (the folder picker
+  often can't make new folders in Drive). The first backup runs as soon as you pick.
   No internet or storage permission: Android's folder picker grants access to that one folder.
 - **First-run setup** (personal, business or both) and a **What's new** sheet for people updating.
 - **App lock** with the phone's fingerprint, face or screen lock; optional **hide in recent apps** (blocks screenshots).

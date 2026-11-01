@@ -4,12 +4,19 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_ACCOUNTS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_CATEGORIES
+import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_LOANS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_RECURRING
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_TXNS
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.DefaultData
+import com.saraltechies.saralmoneytracker.model.Loan
+import com.saraltechies.saralmoneytracker.model.LoanDirection
+import com.saraltechies.saralmoneytracker.model.LoanEventKind
+import com.saraltechies.saralmoneytracker.model.LoanMath
+import com.saraltechies.saralmoneytracker.model.LoanSummary
+import com.saraltechies.saralmoneytracker.model.LoanEvent
 import com.saraltechies.saralmoneytracker.model.Recurrence
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Stats
@@ -38,13 +45,29 @@ data class ImportOptions(
     val otherIncomeName: String,
 )
 
+/** A loan as the screens show it: the person's name, its history and where it stands. */
+data class LoanItem(val loan: Loan, val name: String, val events: List<LoanEvent>, val summary: LoanSummary, val txns: List<Txn>)
+
+/** The terms filled in on the loan form. */
+data class LoanTerms(
+    val name: String,
+    val direction: LoanDirection,
+    val startDate: LocalDate,
+    val rate: Long,
+    val rateUnit: com.saraltechies.saralmoneytracker.model.RateUnit,
+    val plan: com.saraltechies.saralmoneytracker.model.LoanPlan,
+    val installments: Int,
+    val installment: Long,
+    val note: String,
+)
+
 data class ImportReport(val added: Int, val duplicates: Int, val transfers: Int, val categoriesAdded: Int, val accountsAdded: Int, val budgetsSet: Int, val recurringAdded: Int)
 
 /**
  * All reads and writes. Reads are plain blocking calls meant to run inside [watch] (which re-runs them on a
  * background thread after every change), so screens stay in sync without a database framework.
  */
-class MoneyRepository(context: Context) {
+class MoneyRepository(private val context: Context) {
 
     private val db = MoneyDb(context)
     private val version = MutableStateFlow(0L)
@@ -65,9 +88,18 @@ class MoneyRepository(context: Context) {
 
     // ---- Reads --------------------------------------------------------------------------------------------
 
-    fun accounts(includeArchived: Boolean = false): List<Account> = db.readableDatabase.query(
-        T_ACCOUNTS, null, if (includeArchived) null else "archived = 0", null, null, null, "sort, id",
-    ).use { c -> buildList { while (c.moveToNext()) add(MoneyDb.account(c)) } }
+    /**
+     * Your accounts. Loan accounts (one per [Loan]) are left out unless [includeLoans]: they belong on the Loans
+     * screen, not in account pickers. Lookups for showing names pass `true` for both.
+     */
+    fun accounts(includeArchived: Boolean = false, includeLoans: Boolean = includeArchived): List<Account> {
+        val where = listOfNotNull(
+            if (includeArchived) null else "archived = 0",
+            if (includeLoans) null else "type != '${AccountType.LOAN.name}'",
+        ).joinToString(" AND ").ifEmpty { null }
+        return db.readableDatabase.query(T_ACCOUNTS, null, where, null, null, null, "sort, id")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.account(c)) } }
+    }
 
     fun categories(includeArchived: Boolean = false): List<Category> = db.readableDatabase.query(
         T_CATEGORIES, null, if (includeArchived) null else "archived = 0", null, null, null, "sort, id",
@@ -129,7 +161,40 @@ class MoneyRepository(context: Context) {
         arrayOf(categoryId.toString()),
     ).use { it.moveToFirst() }
 
-    fun exportData() = BackupFormat.Data(accounts(true), categories(true), txns(), recurring())
+    fun exportData() = BackupFormat.Data(accounts(true), categories(true), txns(), recurring(), loans())
+
+    /** How often each category was used since [since], to put the usual ones first when adding an entry. */
+    fun categoryUsage(type: TxnType, since: LocalDate): Map<Long, Int> = db.readableDatabase.rawQuery(
+        "SELECT category_id, COUNT(*) FROM $T_TXNS WHERE type = ? AND day >= ? AND category_id IS NOT NULL GROUP BY category_id",
+        arrayOf(type.name, since.toEpochDay().toString()),
+    ).use { c -> buildMap { while (c.moveToNext()) put(c.getLong(0), c.getInt(1)) } }
+
+    // ---- Loans --------------------------------------------------------------------------------------------
+
+    fun loans(): List<Loan> = db.readableDatabase.query(T_LOANS, null, null, null, null, null, "closed, start_day DESC, id DESC")
+        .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.loan(c)) } }
+
+    fun loan(id: Long): Loan? = db.readableDatabase.query(T_LOANS, null, "id = ?", arrayOf(id.toString()), null, null, null)
+        .use { c -> if (c.moveToFirst()) MoneyDb.loan(c) else null }
+
+    /** Which loan account is money lent and which is money borrowed, so entries can say "Given to …" or "Repaid to …". */
+    fun loanDirections(): Map<Long, LoanDirection> = loans().associate { it.accountId to it.direction }
+
+    /** Every loan with its person, history and where it stands today. */
+    fun loanItems(asOf: LocalDate = LocalDate.now()): List<LoanItem> {
+        val loans = loans()
+        if (loans.isEmpty()) return emptyList()
+        val accounts = accounts(includeArchived = true, includeLoans = true).associateBy { it.id }
+        val byLoan = db.readableDatabase.query(T_TXNS, null, "loan_id IS NOT NULL", null, null, null, "day, created")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.txn(c)) } }.groupBy { it.loanId }
+        return loans.map { loan ->
+            val account = accounts[loan.accountId]
+            val events = LoanMath.events(loan, account?.opening ?: 0, byLoan[loan.id].orEmpty())
+            LoanItem(loan, account?.name.orEmpty(), events, LoanMath.summary(loan, events, asOf), byLoan[loan.id].orEmpty())
+        }
+    }
+
+    fun loanItem(id: Long, asOf: LocalDate = LocalDate.now()): LoanItem? = loanItems(asOf).firstOrNull { it.loan.id == id }
 
     // ---- Writes -------------------------------------------------------------------------------------------
 
@@ -245,9 +310,119 @@ class MoneyRepository(context: Context) {
 
     /** Deletes everything and starts again with the default accounts and categories. */
     suspend fun deleteAll() = write { w ->
-        listOf(T_TXNS, T_RECURRING, T_CATEGORIES, T_ACCOUNTS).forEach { w.delete(it, null, null) }
+        listOf(T_TXNS, T_RECURRING, T_LOANS, T_CATEGORIES, T_ACCOUNTS).forEach { w.delete(it, null, null) }
         w.execSQL("DELETE FROM sqlite_sequence")
         db.seed(w)
+    }
+
+    // ---- Loan writes --------------------------------------------------------------------------------------
+
+    /**
+     * Records a new loan of [amount]. With [accountId] the money leaves (or arrives in) that account today's way, as
+     * a transfer; without it the loan is one from before you used the app, so your balances stay as they are.
+     */
+    suspend fun createLoan(terms: LoanTerms, amount: Long, accountId: Long?): Long = write { w ->
+        val sign = if (terms.direction == LoanDirection.LENT) 1 else -1
+        val account = Account(
+            name = uniqueAccountName(w, terms.name.trim(), exceptId = null), type = AccountType.LOAN,
+            opening = if (accountId == null) amount * sign else 0, sort = Int.MAX_VALUE / 2,
+        )
+        val loanAccount = w.insert(T_ACCOUNTS, null, MoneyDb.values(account))
+        val loanId = w.insert(T_LOANS, null, MoneyDb.values(loanFrom(terms, loanAccount)))
+        if (accountId != null) w.insert(T_TXNS, null, MoneyDb.values(loanTxn(terms.direction, loanAccount, loanId, LoanEventKind.GIVEN, amount, terms.startDate, accountId, "")))
+        loanId
+    }
+
+    /** Changes the terms or the person's name. */
+    suspend fun updateLoan(loan: Loan, terms: LoanTerms) = write { w ->
+        w.update(T_LOANS, MoneyDb.values(loanFrom(terms, loan.accountId).copy(id = loan.id, closed = loan.closed, createdAt = loan.createdAt)), "id = ?", arrayOf(loan.id.toString()))
+        w.execSQL("UPDATE $T_ACCOUNTS SET name = ? WHERE id = ?", arrayOf<Any?>(uniqueAccountName(w, terms.name.trim(), loan.accountId), loan.accountId))
+    }
+
+    /**
+     * Adds money given, a repayment, or interest. A payment that covers both interest and principal is two entries,
+     * so interest shows up in your income (or spending) and the principal doesn't.
+     */
+    suspend fun addLoanEntries(loan: Loan, entries: List<Pair<LoanEventKind, Long>>, date: LocalDate, accountId: Long, note: String) = write { w ->
+        for ((kind, amount) in entries) {
+            if (amount <= 0) continue
+            val categoryId = if (kind == LoanEventKind.INTEREST) interestCategory(w, loan.direction) else null
+            w.insert(T_TXNS, null, MoneyDb.values(loanTxn(loan.direction, loan.accountId, loan.id, kind, amount, date, accountId, note.trim(), categoryId)))
+        }
+    }
+
+    /** Changes one entry of a loan's history. [kind] decides which way it goes, as when it was added. */
+    suspend fun updateLoanEntry(loan: Loan, txn: Txn, kind: LoanEventKind, amount: Long, date: LocalDate, accountId: Long, note: String) = write { w ->
+        val categoryId = if (kind == LoanEventKind.INTEREST) (txn.categoryId ?: interestCategory(w, loan.direction)) else null
+        val updated = loanTxn(loan.direction, loan.accountId, loan.id, kind, amount, date, accountId, note.trim(), categoryId).copy(id = txn.id, createdAt = txn.createdAt)
+        w.update(T_TXNS, MoneyDb.values(updated), "id = ?", arrayOf(txn.id.toString()))
+    }
+
+    /** The amount of a loan given before using the app (kept as the loan account's opening balance). */
+    suspend fun setLoanOpening(loan: Loan, amount: Long) = write { w ->
+        val sign = if (loan.direction == LoanDirection.LENT) 1 else -1
+        w.execSQL("UPDATE $T_ACCOUNTS SET opening = ? WHERE id = ?", arrayOf<Any?>(amount * sign, loan.accountId))
+    }
+
+    suspend fun setLoanClosed(id: Long, closed: Boolean) = write { w ->
+        w.execSQL("UPDATE $T_LOANS SET closed = ? WHERE id = ?", arrayOf<Any?>(if (closed) 1 else 0, id))
+    }
+
+    /** Deletes a loan with its whole history; your account balances go back to how they'd be without it. */
+    suspend fun deleteLoan(loan: Loan) = write { w ->
+        w.delete(T_TXNS, "loan_id = ?", arrayOf(loan.id.toString()))
+        w.delete(T_LOANS, "id = ?", arrayOf(loan.id.toString()))
+        w.delete(T_ACCOUNTS, "id = ?", arrayOf(loan.accountId.toString()))
+    }
+
+    private fun loanFrom(terms: LoanTerms, accountId: Long) = Loan(
+        accountId = accountId, direction = terms.direction, startDate = terms.startDate, rate = terms.rate.coerceAtLeast(0), rateUnit = terms.rateUnit,
+        plan = terms.plan, installments = terms.installments.coerceAtLeast(0), installment = terms.installment.coerceAtLeast(0), note = terms.note.trim(),
+    )
+
+    /**
+     * Money given into a lent loan's account, or out of a borrowed loan's account into yours; repayments the other
+     * way round; interest as income (lent) or expense (borrowed).
+     */
+    private fun loanTxn(
+        direction: LoanDirection, loanAccount: Long, loanId: Long, kind: LoanEventKind, amount: Long, date: LocalDate, accountId: Long, note: String,
+        categoryId: Long? = null,
+    ): Txn {
+        val intoLoan = (kind == LoanEventKind.GIVEN) == (direction == LoanDirection.LENT)
+        return when (kind) {
+            LoanEventKind.INTEREST -> Txn(
+                type = if (direction == LoanDirection.LENT) TxnType.INCOME else TxnType.EXPENSE, amount = amount, date = date,
+                categoryId = categoryId, accountId = accountId, note = note, loanId = loanId,
+            )
+            else -> Txn(
+                type = TxnType.TRANSFER, amount = amount, date = date, categoryId = null,
+                accountId = if (intoLoan) accountId else loanAccount, toAccountId = if (intoLoan) loanAccount else accountId, note = note, loanId = loanId,
+            )
+        }
+    }
+
+    /** The category interest goes to: one you already have for interest, or a new "Interest received" / "Interest paid". */
+    private fun interestCategory(w: SQLiteDatabase, direction: LoanDirection): Long {
+        val kind = if (direction == LoanDirection.LENT) TxnType.INCOME else TxnType.EXPENSE
+        val all = w.query(T_CATEGORIES, null, "kind = ? AND archived = 0", arrayOf(kind.name), null, null, "sort, id")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.category(c)) } }
+        all.firstOrNull { it.icon == INTEREST_ICON }?.let { return it.id }
+        all.firstOrNull { it.name.contains("interest", ignoreCase = true) }?.let { return it.id }
+        val name = context.getString(if (direction == LoanDirection.LENT) com.saraltechies.saralmoneytracker.R.string.interest_received else com.saraltechies.saralmoneytracker.R.string.interest_paid)
+        val color = DefaultData.palette[if (direction == LoanDirection.LENT) 2 else 5]
+        return w.insert(T_CATEGORIES, null, MoneyDb.values(Category(name = name, kind = kind, icon = INTEREST_ICON, color = color, sort = all.size)))
+    }
+
+    /** Two loans to people with the same name get "Ravi" and "Ravi (2)", so backups can tell them apart. */
+    private fun uniqueAccountName(w: SQLiteDatabase, base: String, exceptId: Long?): String {
+        val taken = w.rawQuery("SELECT id, name FROM $T_ACCOUNTS", null).use { c ->
+            buildSet { while (c.moveToNext()) if (c.getLong(0) != exceptId) add(c.getString(1).trim().lowercase(Locale.ROOT)) }
+        }
+        val name = base.ifBlank { "?" }
+        if (name.lowercase(Locale.ROOT) !in taken) return name
+        var n = 2
+        while ("$name ($n)".lowercase(Locale.ROOT) in taken) n++
+        return "$name ($n)"
     }
 
     // ---- Import -------------------------------------------------------------------------------------------
@@ -290,6 +465,26 @@ class MoneyRepository(context: Context) {
         val cardNames = if (options.cardBillsAsTransfers) cardBillCategories(result) else emptySet()
 
         for (a in result.accounts) account(a.name, a.type, a.opening, a.archived)
+
+        // Loans from a backup: each has its own account (already created above); link to it, or reuse the same loan.
+        val loansByAccount = w.query(T_LOANS, null, null, null, null, null, null)
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.loan(c)) } }.associateBy { it.accountId }.toMutableMap()
+        val loanIds = HashMap<String, Long>()
+        for (l in result.loans) {
+            val accountId = account(l.name, AccountType.LOAN)
+            val id = loansByAccount[accountId]?.id ?: w.insert(
+                T_LOANS, null,
+                MoneyDb.values(
+                    Loan(
+                        accountId = accountId, direction = l.direction, startDate = l.startDate, rate = l.rate, rateUnit = l.rateUnit, plan = l.plan,
+                        installments = l.installments, installment = l.installment, note = l.note, closed = l.closed,
+                    ),
+                ),
+            ).also { id -> loansByAccount[accountId] = Loan(id = id, accountId = accountId, direction = l.direction, startDate = l.startDate) }
+            loanIds[key(l.name)] = id
+        }
+        fun loanOf(row: com.saraltechies.saralmoneytracker.xlsx.ImportedRow, from: Long, to: Long?): Long? =
+            row.loan?.let { loanIds[key(it)] } ?: loansByAccount[from]?.id ?: to?.let { loansByAccount[it]?.id }
         for (c in result.categories) {
             if (c.kind == TxnType.EXPENSE && key(c.name) in cardNames) continue
             val id = category(c.name, c.kind, c.icon, c.color)
@@ -323,9 +518,9 @@ class MoneyRepository(context: Context) {
                 }
                 row.type == TxnType.TRANSFER -> {
                     val to = row.toAccount?.let { account(it) } ?: continue
-                    Txn(type = TxnType.TRANSFER, amount = row.amount, date = row.date, categoryId = null, accountId = from, toAccountId = to, note = row.note)
+                    Txn(type = TxnType.TRANSFER, amount = row.amount, date = row.date, categoryId = null, accountId = from, toAccountId = to, note = row.note, loanId = loanOf(row, from, to))
                 }
-                else -> Txn(type = row.type, amount = row.amount, date = row.date, categoryId = category(row.category, row.type), accountId = from, note = row.note)
+                else -> Txn(type = row.type, amount = row.amount, date = row.date, categoryId = category(row.category, row.type), accountId = from, note = row.note, loanId = row.loan?.let { loanIds[key(it)] })
             }
             val k = listOf(txn.type.name, txn.date.toEpochDay(), txn.amount, txn.categoryId ?: "", key(txn.note)).joinToString("|")
             if (!existing.add(k)) {
@@ -355,6 +550,9 @@ class MoneyRepository(context: Context) {
     }
 
     companion object {
+        /** Icon key of the categories interest on loans goes to. */
+        const val INTEREST_ICON = "interest"
+
         /** Expense categories in the file that are really credit card bill payments. */
         fun cardBillCategories(result: ImportResult): Set<String> =
             result.rows.filter { it.type == TxnType.EXPENSE && isCardBill(it.category) }

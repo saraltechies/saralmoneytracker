@@ -209,7 +209,7 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="daily_reminder">Daily reminder</string>
-    <string name="daily_reminder_summary">A nudge in the evening, only on days nothing was added</string>
+    <string name="daily_reminder_summary">A nudge in the evening on days nothing was added, and on the day a loan payment is due</string>
     <string name="reminder_time">Reminder time</string>
     <string name="reminder_permission_denied">Allow notifications for Saral Money Tracker to get the reminder</string>
     <string name="app_lock">App lock</string>
@@ -238,8 +238,6 @@
     <string name="share_app">Share the app</string>
     <string name="share_app_summary">Tell a friend who wants to manage money better</string>
     <string name="share_text">I track my income and expenses with Saral Money Tracker. Free, private, no ads: %1$s</string>
-    <string name="source_code">Source code</string>
-    <string name="source_code_summary">Open source on GitHub (GPL-3.0)</string>
     <string name="privacy_policy">Privacy policy</string>
     <string name="more_apps">More from Saral Techies</string>
     <string name="app_file_manager">Saral File Manager</string>
@@ -348,6 +346,9 @@
     <string name="reminder_channel">Daily reminder</string>
     <string name="reminder_title">Anything spent today?</string>
     <string name="reminder_text">Add today\'s expenses in a few seconds while you remember them.</string>
+    <string name="loan_due_title">Loan payment due today</string>
+    <string name="loan_due_receive">%1$s should pay you %2$s</string>
+    <string name="loan_due_pay">Pay %2$s to %1$s</string>
 
     <!-- Launcher shortcuts -->
     <string name="shortcut_expense">Add expense</string>
@@ -360,6 +361,129 @@
     <string name="default_account_card">Credit card</string>
     <string name="default_other_expense">Other</string>
     <string name="default_other_income">Other Income</string>
+    <!-- Entry form: categories -->
+    <string name="more_categories">More</string>
+    <string name="choose_category">Choose a category</string>
+    <string name="search_categories">Search categories</string>
+    <string name="no_matching_categories">No category with that name. Tap Manage to add one.</string>
+
+    <!-- Common -->
+    <string name="amount">Amount</string>
+    <string name="more">More</string>
+    <string name="show">Show</string>
+    <string name="hide">Hide</string>
+
+    <!-- Loans: money lent and borrowed -->
+    <string name="loans_title">Lent &amp; borrowed</string>
+    <string name="add_loan">Add loan</string>
+    <string name="edit_loan">Edit loan</string>
+    <string name="account_type_loan">Loan</string>
+    <string name="loans_to_receive">To receive</string>
+    <string name="loans_to_pay">To pay</string>
+    <string name="loans_all">All</string>
+    <string name="loans_lent">Lent</string>
+    <string name="loans_borrowed">Borrowed</string>
+    <string name="loans_closed">Closed</string>
+    <string name="loans_empty_title">Track money lent and borrowed</string>
+    <string name="loans_empty_text">Money you gave to friends or family, or took from them, on credit or on interest. See what\'s due each month and who still owes what.</string>
+    <string name="loans_row_empty">Money you gave or took, with interest and EMIs</string>
+    <string name="loans_row_summary">To receive %1$s · To pay %2$s</string>
+    <string name="loan_i_gave">I gave money</string>
+    <string name="loan_i_took">I took money</string>
+    <string name="loan_gave_hint">Money you lent. It isn\'t counted as spending, and repayments aren\'t counted as income. Interest is.</string>
+    <string name="loan_took_hint">Money you borrowed. It isn\'t counted as income, and repayments aren\'t counted as spending. Interest is.</string>
+    <string name="loan_given_to">Given to</string>
+    <string name="loan_taken_from">Taken from</string>
+    <string name="loan_date_given">Date given</string>
+    <string name="loan_date_taken">Date taken</string>
+    <string name="loan_not_from_accounts">Not from my accounts (an older loan)</string>
+    <string name="loan_not_from_accounts_hint">Your account balances won\'t change. Use this for a loan given before you started using the app.</string>
+    <string name="loan_interest">Interest</string>
+    <string name="loan_no_interest">No interest</string>
+    <string name="loan_with_interest">With interest</string>
+    <string name="loan_rate">Rate</string>
+    <string name="loan_per_month">a month</string>
+    <string name="loan_per_year">a year</string>
+    <string name="loan_interest_hint">Simple interest on what is still owed: paying back part of it lowers the interest from that day.</string>
+    <string name="loan_repayment">Repayment</string>
+    <string name="loan_any_time">Any time</string>
+    <string name="loan_monthly">Monthly EMI</string>
+    <string name="loan_months">Months</string>
+    <string name="loan_installment">Monthly amount</string>
+    <string name="loan_installment_auto">Worked out from the amount, rate and months. Type your own if it\'s different.</string>
+    <string name="loan_installment_own">Your own monthly amount. Clear it to work it out again.</string>
+    <string name="loan_preview_plan">%1$s a month for %2$d months, from %3$s</string>
+    <string name="loan_preview_total_receive">You\'ll get back %1$s in all, %2$s of it interest</string>
+    <string name="loan_preview_total_pay">You\'ll pay back %1$s in all, %2$s of it interest</string>
+    <string name="loan_preview_interest">Interest: %1$s a month, %2$s a year</string>
+    <string name="rate_per_month">%1$s%% a month</string>
+    <string name="rate_per_year">%1$s%% a year</string>
+    <string name="loan_closed">Closed</string>
+    <string name="loan_settled">Settled</string>
+    <string name="loan_overdue">Overdue %1$s</string>
+    <string name="loan_next_due">Next %1$s on %2$s</string>
+    <string name="loan_still_to_receive">Still to receive</string>
+    <string name="loan_still_to_pay">Still to pay</string>
+    <string name="loan_given">Given</string>
+    <string name="loan_taken">Taken</string>
+    <string name="loan_paid_back">Paid back</string>
+    <string name="loan_principal_left">Principal left</string>
+    <string name="loan_interest_so_far">Interest so far</string>
+    <string name="loan_interest_received">Interest received</string>
+    <string name="loan_interest_paid">Interest paid</string>
+    <string name="loan_interest_due">Interest due</string>
+    <string name="loan_interest_per_month">Interest a month now</string>
+    <string name="loan_installments_due">Instalments due</string>
+    <plurals name="loan_installments_of">
+        <item quantity="one">%1$d of %2$d</item>
+        <item quantity="other">%1$d of %2$d</item>
+    </plurals>
+    <string name="loan_overdue_label">Overdue</string>
+    <string name="loan_next_payment">Next payment</string>
+    <string name="loan_settled_text">All paid back. Close this loan to move it out of the way.</string>
+    <string name="loan_close">Close loan</string>
+    <string name="loan_reopen">Reopen loan</string>
+    <string name="loan_record_received">Received</string>
+    <string name="loan_record_paid">Paid</string>
+    <string name="loan_gave_more">Gave more</string>
+    <string name="loan_took_more">Took more</string>
+    <string name="loan_plan_title">EMI plan</string>
+    <string name="loan_plan_split">Principal %1$s + interest %2$s</string>
+    <string name="loan_paid">Paid</string>
+    <string name="loan_history">History</string>
+    <string name="loan_event_given">Given</string>
+    <string name="loan_event_taken">Taken</string>
+    <string name="loan_event_received">Received back</string>
+    <string name="loan_event_repaid">Paid back</string>
+    <string name="loan_event_interest_received">Interest received</string>
+    <string name="loan_event_interest_paid">Interest paid</string>
+    <string name="loan_before_app">Before using the app</string>
+    <string name="loan_before_app_hint">This amount was given before you used the app, so it doesn\'t change your account balances.</string>
+    <string name="loan_interest_part">Of which interest</string>
+    <string name="loan_split_hint">Interest due on that day: %1$s. The rest, %2$s, goes to the principal.</string>
+    <string name="loan_share">Share statement</string>
+    <string name="loan_delete_title">Delete this loan?</string>
+    <string name="loan_delete_text">Everything recorded for %1$s will be deleted, and your account balances will go back to what they would be without it.</string>
+    <string name="interest_received">Interest received</string>
+    <string name="interest_paid">Interest paid</string>
+    <string name="txn_loan_given">Given to %1$s</string>
+    <string name="txn_loan_received">Received from %1$s</string>
+    <string name="txn_loan_borrowed">Borrowed from %1$s</string>
+    <string name="txn_loan_repaid">Repaid to %1$s</string>
+    <string name="error_loan_name">Enter the person\'s name</string>
+    <string name="error_rate">Enter the interest rate</string>
+    <string name="error_months">Enter the number of months (1 to 600)</string>
+    <string name="error_installment">Enter the monthly amount</string>
+    <string name="error_interest_part">The interest can\'t be more than the amount</string>
+    <string name="statement_title">Loan statement: %1$s (as on %2$s)</string>
+    <string name="statement_rate">Interest: %1$s</string>
+    <string name="statement_installment">EMI: %1$s a month for %2$d months</string>
+    <string name="statement_principal_left">Principal left: %1$s</string>
+    <string name="statement_interest_due">Interest due: %1$s</string>
+    <string name="statement_total_to_receive">Total to receive: %1$s</string>
+    <string name="statement_total_to_pay">Total to pay: %1$s</string>
+    <string name="statement_footer">Sent from Saral Money Tracker</string>
+
     <string-array name="default_expense_categories">
         <item>Food &amp; Dining</item>
         <item>Groceries</item>

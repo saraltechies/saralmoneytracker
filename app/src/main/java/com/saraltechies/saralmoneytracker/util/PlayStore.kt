@@ -20,7 +20,6 @@ object PlayStore {
     const val SARALREADER = "com.saraltechies.saralreader"
     const val SARAL_FILE_MANAGER = "com.saraltechies.saralfilemanager"
     const val WEBSITE = "https://saraltechies.com/"
-    const val SOURCE_CODE = "https://github.com/saraltechies/saralmoneytracker"
     const val PRIVACY_POLICY = "https://saraltechies.com/saralmoneytracker/privacy-policy"
 
     /** This app's own listing, also from the ".debug" build. */

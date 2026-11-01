@@ -1,7 +1,7 @@
 # Play Console answers for Saral Money Tracker
 
 Answers for every declaration in **Policy → App content**, plus the release setup.
-They match the code as of v1.0.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
+They match the code as of v1.1.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
 (the manifest removes it and the release workflow fails if it appears).
 **Re-check them whenever you add an SDK or a permission.**
 
@@ -46,6 +46,8 @@ They match the code as of v1.0.0: no ads, no analytics, no crash reporting, and 
 ## Financial features
 - The app is a **personal budgeting / expense tracking** tool. It offers no banking, loans, payments, investment, trading,
   crypto or insurance services, does not connect to bank accounts and does not move money.
+- Lent & borrowed (1.1) only records money the user gave to or took from people they know, and works out interest and
+  EMIs for their own reference. The app doesn't lend, arrange or collect loans, so this is still not a loan feature.
 - In the declaration, choose the option for apps that **don't provide any of the listed financial features**. If the form asks
   specifically about budgeting tools, select **Personal finance management / budgeting** (no regulated services).
 
@@ -67,9 +69,21 @@ The app does not use SMS, call log, location, contacts or all-files access.
 - Play App Signing: **use Google-generated app signing key**. Upload `app-release.aab`, signed with our upload key `saralmoneytracker-upload`.
 - Upload key SHA-256 (for reference):
   `C6:3B:B0:55:85:E0:D3:84:DF:58:25:64:36:B6:28:06:C0:25:33:6B:3B:23:56:4A:C6:57:B8:C0:14:1C:A1:FA`
-- Deobfuscation file: upload `mapping.txt` from the same build.
-- Release name: `1.0.0 (1)`
-- Release notes (en-IN):
+- Deobfuscation file: nothing to do. The build puts `mapping.txt` inside the AAB and Play picks it up (App bundle
+  explorer → Downloads shows it as "ReTrace mapping file").
+- Release name: `1.1.0 (2)` (1.0.0 was `1.0.0 (1)`)
+- Release notes for 1.1.0 (en-IN):
+  ```
+  <en-IN>
+  New: Lent & borrowed.
+  • Track money given to or taken from people, on credit or on interest
+  • Interest per month or per year, any-time repayment or monthly EMI
+  • See who owes what, interest due, the next payment and what is overdue
+  • Reminder on the due date and a statement to share
+  Also: your most used categories now come first when adding an entry.
+  </en-IN>
+  ```
+- Release notes for 1.0.0 (en-IN):
   ```
   <en-IN>
   First release of Saral Money Tracker.

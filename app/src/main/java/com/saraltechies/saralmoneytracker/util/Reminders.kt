@@ -17,6 +17,10 @@ import androidx.core.content.ContextCompat
 import com.saraltechies.saralmoneytracker.MainActivity
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.SaralMoneyTrackerApp
+import com.saraltechies.saralmoneytracker.data.LoanItem
+import com.saraltechies.saralmoneytracker.model.CurrencyInfo
+import com.saraltechies.saralmoneytracker.model.LoanDirection
+import com.saraltechies.saralmoneytracker.model.Money
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,6 +36,7 @@ object Reminders {
 
     private const val CHANNEL = "daily_reminder"
     private const val NOTIFICATION_ID = 1
+    private const val LOANS_NOTIFICATION_ID = 2
     private const val REQUEST = 10
 
     fun createChannel(context: Context) {
@@ -80,6 +85,32 @@ object Reminders {
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification) }
     }
+
+    /** On the day a loan instalment or interest is due, says who pays whom how much. */
+    @SuppressLint("MissingPermission") // checked by canNotify
+    fun showLoansDue(context: Context, loans: List<LoanItem>, currency: CurrencyInfo, today: LocalDate = LocalDate.now()) {
+        if (!canNotify(context)) return
+        val due = loans.filter { !it.loan.closed && it.summary.nextDueDate == today && it.summary.nextDueAmount > 0 }
+        if (due.isEmpty()) return
+        val lines = due.map {
+            val amount = Money.format(it.summary.nextDueAmount, currency)
+            context.getString(if (it.loan.direction == LoanDirection.LENT) R.string.loan_due_receive else R.string.loan_due_pay, it.name, amount)
+        }
+        val open = PendingIntent.getActivity(
+            context, 1, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(ContextCompat.getColor(context, R.color.brand_blue))
+            .setContentTitle(context.getString(R.string.loan_due_title))
+            .setContentText(lines.first())
+            .setStyle(NotificationCompat.InboxStyle().also { style -> lines.forEach(style::addLine) })
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(LOANS_NOTIFICATION_ID, notification) }
+    }
 }
 
 /** The daily alarm: reminds only if nothing was added today. */
@@ -89,7 +120,9 @@ class ReminderReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                if (app.settings.current().reminderOn && !app.repository.hasTxnOn(LocalDate.now())) Reminders.show(context)
+                val prefs = app.settings.current()
+                if (prefs.reminderOn && !app.repository.hasTxnOn(LocalDate.now())) Reminders.show(context)
+                if (prefs.reminderOn) Reminders.showLoansDue(context, app.repository.loanItems(), prefs.currency)
             } finally {
                 pending.finish()
             }

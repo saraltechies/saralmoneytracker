@@ -5,6 +5,10 @@ import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Frequency
+import com.saraltechies.saralmoneytracker.model.Loan
+import com.saraltechies.saralmoneytracker.model.LoanDirection
+import com.saraltechies.saralmoneytracker.model.LoanPlan
+import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
@@ -150,6 +154,44 @@ class SpreadsheetImportTest {
         val csv = StringWriter().also { BackupFormat.writeCsv(BackupFormat.Data(accounts, categories, txns, rules), it) }.toString()
         assertTrue(csv.contains("\"'=lunch, \"\"office\"\"\""))
         assertTrue(csv.lines().first().startsWith("Date,Type,Amount"))
+    }
+
+    @Test
+    fun backupKeepsLoans() {
+        val accounts = listOf(
+            Account(id = 1, name = "Cash", type = AccountType.CASH),
+            Account(id = 5, name = "Ravi", type = AccountType.LOAN),
+            Account(id = 6, name = "Meena", type = AccountType.LOAN, opening = -2_000_000),
+        )
+        val loans = listOf(
+            Loan(
+                id = 1, accountId = 5, direction = LoanDirection.LENT, startDate = d("2026-01-05"), rate = 150, rateUnit = RateUnit.MONTH,
+                plan = LoanPlan.MONTHLY, installments = 12, installment = 900_000, note = "For the shop",
+            ),
+            Loan(id = 2, accountId = 6, direction = LoanDirection.BORROWED, startDate = d("2025-12-01")),
+        )
+        val txns = listOf(
+            Txn(type = TxnType.TRANSFER, amount = 10_000_000, date = d("2026-01-05"), categoryId = null, accountId = 1, toAccountId = 5, loanId = 1),
+            Txn(type = TxnType.INCOME, amount = 150_000, date = d("2026-02-05"), categoryId = null, accountId = 1, loanId = 1),
+        )
+        val out = ByteArrayOutputStream()
+        BackupFormat.writeXlsx(BackupFormat.Data(accounts, emptyList(), txns, emptyList(), loans), out, d("2026-03-01"), "1.1.0")
+        val result = SpreadsheetImport.read(XlsxReader.read(ByteArrayInputStream(out.toByteArray())))
+
+        assertEquals(listOf("Ravi", "Meena"), result.loans.map { it.name })
+        val ravi = result.loans.first()
+        assertEquals(LoanDirection.LENT, ravi.direction)
+        assertEquals(150L, ravi.rate)
+        assertEquals(RateUnit.MONTH, ravi.rateUnit)
+        assertEquals(LoanPlan.MONTHLY, ravi.plan)
+        assertEquals(12, ravi.installments)
+        assertEquals(900_000L, ravi.installment)
+        assertEquals("For the shop", ravi.note)
+        assertEquals(LoanDirection.BORROWED, result.loans[1].direction)
+        assertEquals(AccountType.LOAN, result.accounts.single { it.name == "Meena" }.type)
+        assertEquals(-2_000_000L, result.accounts.single { it.name == "Meena" }.opening)
+        // The interest entry names its loan, so it's linked again on import.
+        assertEquals("Ravi", result.rows.single { it.type == TxnType.INCOME }.loan)
     }
 
     @Test

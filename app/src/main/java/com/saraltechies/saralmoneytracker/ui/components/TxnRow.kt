@@ -22,12 +22,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.model.Account
+import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
+import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
 
 /** Lookup tables a list of entries needs to show names and icons. */
-class Lookups(categories: List<Category>, accounts: List<Account>) {
+class Lookups(categories: List<Category>, accounts: List<Account>, val loanDirections: Map<Long, LoanDirection> = emptyMap()) {
     val categories = categories.associateBy { it.id }
     val accounts = accounts.associateBy { it.id }
 }
@@ -37,11 +39,32 @@ fun TxnRow(txn: Txn, lookups: Lookups, onClick: () -> Unit, showDate: Boolean = 
     val category = txn.categoryId?.let { lookups.categories[it] }
     val account = lookups.accounts[txn.accountId]
     val toAccount = txn.toAccountId?.let { lookups.accounts[it] }
+    // Money given or paid back on a loan reads "Given to Ravi", not "Transfer: Cash → Ravi".
+    val loanAccount = if (txn.type == TxnType.TRANSFER && txn.loanId != null) {
+        if (toAccount?.type == AccountType.LOAN) toAccount else account?.takeIf { it.type == AccountType.LOAN }
+    } else null
+    val loanTitle = loanAccount?.let { la ->
+        val into = la.id == txn.toAccountId
+        val lent = lookups.loanDirections[la.id] != LoanDirection.BORROWED
+        stringResource(
+            when {
+                lent && into -> R.string.txn_loan_given
+                lent -> R.string.txn_loan_received
+                into -> R.string.txn_loan_repaid
+                else -> R.string.txn_loan_borrowed
+            },
+            la.name,
+        )
+    }
     val title = when (txn.type) {
-        TxnType.TRANSFER -> stringResource(R.string.type_transfer)
+        TxnType.TRANSFER -> loanTitle ?: stringResource(R.string.type_transfer)
         else -> category?.name ?: stringResource(R.string.uncategorized)
     }
-    val accountText = if (txn.type == TxnType.TRANSFER) "${account?.name.orEmpty()} → ${toAccount?.name.orEmpty()}" else account?.name.orEmpty()
+    val accountText = when {
+        loanAccount != null -> (if (loanAccount.id == txn.toAccountId) account else toAccount)?.name.orEmpty()
+        txn.type == TxnType.TRANSFER -> "${account?.name.orEmpty()} → ${toAccount?.name.orEmpty()}"
+        else -> account?.name.orEmpty()
+    }
     val subtitle = listOfNotNull(
         txn.note.takeIf { it.isNotBlank() },
         accountText.takeIf { it.isNotBlank() },
@@ -60,7 +83,8 @@ fun TxnRow(txn: Txn, lookups: Lookups, onClick: () -> Unit, showDate: Boolean = 
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (txn.type == TxnType.TRANSFER) IconBadge(CategoryIcons.transfer, MaterialTheme.colorScheme.primary)
+        if (loanAccount != null) IconBadge(CategoryIcons.account(AccountType.LOAN), MaterialTheme.colorScheme.primary)
+        else if (txn.type == TxnType.TRANSFER) IconBadge(CategoryIcons.transfer, MaterialTheme.colorScheme.primary)
         else IconBadge(CategoryIcons.of(category?.icon), category?.let { Color(it.color) } ?: MaterialTheme.colorScheme.outline)
         Spacer(Modifier.size(14.dp))
         Column(Modifier.weight(1f)) {

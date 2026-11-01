@@ -8,9 +8,10 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=com.saraltechies.saralmoneytracker)
 -->
 
-## Features (1.0)
+## Features (1.1)
 
-- **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), a category grid, today/yesterday chips, and
+- **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), your most used categories first (with **More**
+  and a search for the rest), today/yesterday chips, and
   the last used account picked for you. Expense, income or **transfer**.
 - **Transfers are not spending.** Paying a credit card bill, withdrawing cash or moving money to savings moves money between
   your own accounts, so it never inflates your expenses. Card purchases are counted once, when you make them.
@@ -25,14 +26,19 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   what you owe). Each account has its own history.
 - **Repeating entries**: salary, rent, EMIs, SIPs and subscriptions are added on their dates by themselves (daily, weekly,
   monthly, yearly; a rule started on the 31st lands on the last day of shorter months).
+- **Lent & borrowed**: money given to or taken from friends and family, on credit or on interest (per month or per year,
+  simple interest on what is still owed), paid back any time or as a monthly EMI. Shows what each person still owes,
+  interest due, the EMI plan with paid and late instalments, and what is overdue; a payment is split into interest and
+  principal for you. Each loan has its own account, so balances and net worth stay right and only the interest counts as
+  income or spending. A reminder on the day a payment is due, and a plain-text statement to share with the person.
 - **Search** every note and category; filter by expense, income or transfer.
 - **Excel import**: bring in a hand-made tracker (monthly "Money Out / Money In" sheets), any table with Date and Amount
   columns, or a bank statement with Debit/Credit columns. Copied rows are skipped, "Credit Card" bill payments can be turned
   into transfers, and a summary sheet's planned amounts can become budgets. Importing the same file twice is safe.
-- **Excel export** that doubles as a full backup (accounts, categories with budgets, repeating entries, every entry), and CSV.
+- **Excel export** that doubles as a full backup (accounts, categories with budgets, repeating entries, loans, every entry), and CSV.
 - **App lock** with the phone's fingerprint, face or screen lock; optional **hide in recent apps** (blocks screenshots).
-- **Daily reminder** in the evening, only on days nothing was added.
-- 29 currencies, Indian number grouping for rupees (₹1,25,000), editable categories with 47 icons and 20 colours,
+- **Daily reminder** in the evening on days nothing was added, and on the day a loan payment is due.
+- 29 currencies, Indian number grouping for rupees (₹1,25,000), editable categories with 49 icons and 20 colours,
   light/dark theme, launcher shortcuts (Add expense, Add income, Transfer).
 - Google Play rating and in-app update prompts (through the Play Store app, so still no internet permission).
 
@@ -55,7 +61,7 @@ minSdk 26 (Android 8.0), targetSdk 36, compileSdk 37.
 
 ```
 app/src/main/java/com/saraltechies/saralmoneytracker/
-├── model/   # Money (hundredths, formatting), periods, stats and budgets, repeating dates (pure JVM, unit-tested)
+├── model/   # Money (hundredths, formatting), periods, stats and budgets, repeating dates, loan interest and EMIs (pure JVM, unit-tested)
 ├── xlsx/    # .xlsx writer and reader, spreadsheet import, backup/export format (pure JVM, unit-tested)
 ├── data/    # SQLite database and repository, DataStore settings, review policy
 ├── ui/      # Compose: home, entries, add/edit with keypad, stats, budgets, accounts, settings, import, lock

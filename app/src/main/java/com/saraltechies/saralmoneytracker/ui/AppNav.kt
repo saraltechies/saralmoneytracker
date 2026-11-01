@@ -19,6 +19,7 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.AppPrefs
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
+import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.PeriodKind
 import com.saraltechies.saralmoneytracker.model.TxnType
 import com.saraltechies.saralmoneytracker.ui.accounts.AccountsScreen
@@ -31,6 +32,9 @@ import com.saraltechies.saralmoneytracker.ui.components.MainTab
 import com.saraltechies.saralmoneytracker.ui.edit.EditScreen
 import com.saraltechies.saralmoneytracker.ui.home.HomeScreen
 import com.saraltechies.saralmoneytracker.ui.importing.ImportScreen
+import com.saraltechies.saralmoneytracker.ui.loans.LoanDetailScreen
+import com.saraltechies.saralmoneytracker.ui.loans.LoanEditScreen
+import com.saraltechies.saralmoneytracker.ui.loans.LoansScreen
 import com.saraltechies.saralmoneytracker.ui.recurring.RecurringScreen
 import com.saraltechies.saralmoneytracker.ui.settings.SettingsScreen
 import com.saraltechies.saralmoneytracker.ui.stats.StatsScreen
@@ -47,6 +51,12 @@ private object Routes {
     const val CATEGORIES = "categories"
     const val RECURRING = "recurring"
     const val IMPORT = "import"
+    const val LOANS = "loans"
+    const val LOAN = "loan/{id}"
+    const val LOAN_EDIT = "loanEdit?id={id}&dir={dir}"
+
+    fun loan(id: Long) = "loan/$id"
+    fun loanEdit(id: Long = 0, dir: LoanDirection = LoanDirection.LENT) = "loanEdit?id=$id&dir=${dir.name}"
 
     fun edit(id: Long = 0, rule: Long = 0, type: TxnType = TxnType.EXPENSE) = "edit?id=$id&rule=$rule&type=${type.name}"
 }
@@ -100,6 +110,8 @@ fun AppNav(
                     onOpenRecurring = { nav.navigate(Routes.edit(rule = it)) },
                     onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                     onImport = { nav.navigate(Routes.IMPORT) },
+                    onOpenLoans = { nav.navigate(Routes.LOANS) },
+                    onOpenLoan = { nav.navigate(Routes.loan(it)) },
                     updateReady = updateReady,
                     onRestartForUpdate = onRestartForUpdate,
                     onReviewMoment = onReviewMoment,
@@ -163,6 +175,7 @@ fun AppNav(
                     bottomBar = { bottomBar(MainTab.ACCOUNTS) },
                     onOpenAccount = { nav.navigate("account/$it") },
                     onTransfer = { nav.navigate(Routes.edit(type = TxnType.TRANSFER)) },
+                    onOpenLoans = { nav.navigate(Routes.LOANS) },
                 )
             }
             composable(
@@ -190,6 +203,10 @@ fun AppNav(
                         }
                     },
                     onManageCategories = { nav.navigate(Routes.CATEGORIES) },
+                    onOpenLoan = { id ->
+                        nav.popBackStack()
+                        nav.navigate(Routes.loan(id))
+                    },
                 )
             }
             composable(Routes.SETTINGS) {
@@ -211,6 +228,45 @@ fun AppNav(
                     onBack = { nav.popBackStack() },
                     onOpen = { nav.navigate(Routes.edit(rule = it)) },
                     onAdd = { nav.navigate(Routes.edit(rule = NEW_RULE)) },
+                )
+            }
+            composable(Routes.LOANS) {
+                LoansScreen(
+                    repository,
+                    onBack = { nav.popBackStack() },
+                    onOpen = { nav.navigate(Routes.loan(it)) },
+                    onAdd = { nav.navigate(Routes.loanEdit(dir = it)) },
+                )
+            }
+            composable(Routes.LOAN, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                LoanDetailScreen(
+                    repository = repository,
+                    settings = settings,
+                    loanId = id,
+                    onBack = { nav.popBackStack() },
+                    onEdit = { nav.navigate(Routes.loanEdit(id = id)) },
+                )
+            }
+            composable(
+                Routes.LOAN_EDIT,
+                arguments = listOf(
+                    navArgument("id") { type = NavType.LongType; defaultValue = 0L },
+                    navArgument("dir") { type = NavType.StringType; defaultValue = LoanDirection.LENT.name },
+                ),
+            ) { entry ->
+                val args = entry.arguments
+                LoanEditScreen(
+                    repository = repository,
+                    settings = settings,
+                    loanId = args?.getLong("id") ?: 0L,
+                    initialDirection = LoanDirection.entries.firstOrNull { it.name == args?.getString("dir") } ?: LoanDirection.LENT,
+                    onBack = { nav.popBackStack() },
+                    // A new loan opens on its own screen, so the next step (a payment, the plan) is right there.
+                    onSaved = { id ->
+                        nav.popBackStack()
+                        nav.navigate(Routes.loan(id))
+                    },
                 )
             }
             composable(Routes.IMPORT) {

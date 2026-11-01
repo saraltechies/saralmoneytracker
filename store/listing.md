@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.0.0. Re-check before each release.
+Every claim below matches the code as of 1.1.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -13,7 +13,7 @@ Saral Money Tracker is a simple, private way to track your income and expenses. 
 
 ADD AN ENTRY IN SECONDS
 • A keypad that adds up sums for you: type 250+120+45 and save ₹415
-• Pick a category with one tap; your last used account is chosen for you
+• Your most used categories come first, with More and a search for the rest; your last used account is chosen for you
 • Today and Yesterday shortcuts, or any date
 • Notes, and search across every note and category
 
@@ -37,6 +37,15 @@ ACCOUNTS AND CREDIT CARDS, DONE RIGHT
 • Net worth: what you have minus what you owe
 • Paying a credit card bill or withdrawing cash is a transfer, so it's never counted as spending twice
 
+LENT AND BORROWED MONEY
+• Track money you gave to friends and family, or took from them, on credit or on interest
+• Interest per month (like 2% a month) or per year, on what is still owed
+• Paid back any time, or as a monthly EMI with the full plan worked out
+• See who owes what, interest due, the next payment and anything overdue
+• Payments are split into interest and principal for you
+• Only interest counts as income or spending; your balances stay right
+• A reminder on the day a payment is due, and a statement to share with the person
+
 REPEATING ENTRIES
 • Add salary, rent, EMIs, SIPs and subscriptions once
 • They're recorded on their dates by themselves: daily, weekly, monthly or yearly
@@ -52,11 +61,10 @@ PRIVATE AND SECURE
 • No ads, no sign-up, no tracking
 • App lock with your fingerprint, face or phone PIN
 • Hide the app's content in recent apps
-• Free and open source under the GPL-3.0 licence: github.com/saraltechies/saralmoneytracker
 
 ALSO
 • 29 currencies, with Indian number format for rupees (₹1,25,000)
-• Your own categories with 47 icons and 20 colours
+• Your own categories with 49 icons and 20 colours
 • Optional daily reminder, only on days you haven't added anything
 • Light and dark themes, launcher shortcuts for Add expense, Add income and Transfer
 

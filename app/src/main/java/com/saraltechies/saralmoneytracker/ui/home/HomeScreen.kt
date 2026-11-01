@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -57,6 +58,7 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.AppPrefs
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
+import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.PeriodKind
 import com.saraltechies.saralmoneytracker.model.Periods
 import com.saraltechies.saralmoneytracker.model.Recurrence
@@ -69,6 +71,8 @@ import com.saraltechies.saralmoneytracker.ui.components.Lookups
 import com.saraltechies.saralmoneytracker.ui.components.SectionTitle
 import com.saraltechies.saralmoneytracker.ui.components.TxnRow
 import com.saraltechies.saralmoneytracker.ui.components.money
+import com.saraltechies.saralmoneytracker.ui.loans.LoanRow
+import com.saraltechies.saralmoneytracker.ui.loans.LoanTotalsCard
 import com.saraltechies.saralmoneytracker.ui.theme.AppTheme
 import com.saraltechies.saralmoneytracker.ui.theme.BrandBlue
 import com.saraltechies.saralmoneytracker.ui.theme.BrandNavy
@@ -87,6 +91,7 @@ private class HomeData(
     val recent: List<com.saraltechies.saralmoneytracker.model.Txn> = emptyList(),
     val upcoming: List<Pair<LocalDate, com.saraltechies.saralmoneytracker.model.Recurring>> = emptyList(),
     val lookups: Lookups = Lookups(emptyList(), emptyList()),
+    val loans: List<com.saraltechies.saralmoneytracker.data.LoanItem> = emptyList(),
     val loaded: Boolean = false,
 )
 
@@ -108,6 +113,8 @@ fun HomeScreen(
     onOpenRecurring: (Long) -> Unit,
     onOpenSettings: () -> Unit,
     onImport: () -> Unit,
+    onOpenLoans: () -> Unit,
+    onOpenLoan: (Long) -> Unit,
     updateReady: Boolean,
     onRestartForUpdate: () -> Unit,
     onReviewMoment: () -> Unit,
@@ -131,7 +138,7 @@ fun HomeScreen(
                 monthExpense = totals.expense,
                 todayExpense = Stats.totals(txns.filter { it.date == today }).expense,
                 weekExpense = Stats.totals(txns.filter { it.date in week }).expense,
-                totalBalance = accounts.filter { !it.archived }.sumOf { balances[it.id] ?: 0 },
+                totalBalance = accounts.filter { !it.archived && it.type != com.saraltechies.saralmoneytracker.model.AccountType.LOAN }.sumOf { balances[it.id] ?: 0 },
                 txnCount = repository.txnCount(),
                 budget = Stats.budget(categories.filter { !it.archived }, monthTxns, month, today),
                 top = Stats.byCategory(monthTxns, TxnType.EXPENSE).take(4),
@@ -139,7 +146,8 @@ fun HomeScreen(
                 upcoming = repository.recurring()
                     .flatMap { r -> Recurrence.upcoming(r, today, 7).map { it to r } }
                     .sortedBy { it.first }.take(5),
-                lookups = Lookups(categories, accounts),
+                lookups = Lookups(categories, accounts, repository.loanDirections()),
+                loans = repository.loanItems(today).filter { !it.loan.closed },
                 loaded = true,
             )
         }
@@ -154,6 +162,7 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    IconButton(onClick = onOpenLoans) { Icon(Icons.Filled.Handshake, stringResource(R.string.loans_title)) }
                     IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, stringResource(R.string.search)) }
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
                 },
@@ -193,6 +202,25 @@ fun HomeScreen(
                 )
             }
             item { BudgetCard(data.budget, onOpenBudgets) }
+
+            if (data.loans.isNotEmpty()) {
+                item {
+                    SectionTitle(stringResource(R.string.loans_title)) { TextButton(onClick = onOpenLoans) { Text(stringResource(R.string.see_all)) } }
+                }
+                item {
+                    LoanTotalsCard(
+                        toReceive = data.loans.filter { it.loan.direction == LoanDirection.LENT }.sumOf { it.summary.outstanding },
+                        toPay = data.loans.filter { it.loan.direction == LoanDirection.BORROWED }.sumOf { it.summary.outstanding },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        onClick = onOpenLoans,
+                    )
+                }
+                // Payments that are late or due this week.
+                val soon = today.plusDays(7)
+                val due = data.loans.filter { it.summary.overdue > 0 || it.summary.nextDueDate?.let { d -> !d.isAfter(soon) } == true }
+                    .sortedBy { it.summary.nextDueDate ?: today }.take(3)
+                items(due, key = { "loan:${it.loan.id}" }) { LoanRow(it, onClick = { onOpenLoan(it.loan.id) }) }
+            }
 
             if (data.top.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.top_spending)) { TextButton(onClick = onOpenStats) { Text(stringResource(R.string.see_details)) } } }

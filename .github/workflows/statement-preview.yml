@@ -38,7 +38,7 @@ jobs:
           target: google_apis
           script: |
             ./gradlew installDebug installDebugAndroidTest --stacktrace
-            adb shell am instrument -w com.saraltechies.saralmoneytracker.debug.test/androidx.test.runner.AndroidJUnitRunner | tee instrument.txt
+            adb shell am instrument -w -e notClass com.saraltechies.saralmoneytracker.StoreScreenshotsTest com.saraltechies.saralmoneytracker.debug.test/androidx.test.runner.AndroidJUnitRunner | tee instrument.txt
             grep -q "OK (" instrument.txt
             mkdir -p preview
             adb pull /sdcard/Android/data/com.saraltechies.saralmoneytracker.debug/files/preview/. preview/ || true

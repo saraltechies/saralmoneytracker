@@ -3,6 +3,8 @@ package com.saraltechies.saralmoneytracker.xlsx
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
+import com.saraltechies.saralmoneytracker.model.Contact
+import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Loan
 import com.saraltechies.saralmoneytracker.model.LoanDirection
@@ -28,6 +30,7 @@ object BackupFormat {
     const val SHEET_CATEGORIES = "Categories"
     const val SHEET_RECURRING = "Recurring"
     const val SHEET_LOANS = "Loans"
+    const val SHEET_CONTACTS = "Contacts"
 
     private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note", "Loan")
 
@@ -42,6 +45,7 @@ object BackupFormat {
         val txns: List<Txn>,
         val recurring: List<Recurring>,
         val loans: List<Loan> = emptyList(),
+        val contacts: List<Contact> = emptyList(),
     )
 
     fun writeXlsx(data: Data, out: OutputStream, exportedOn: LocalDate, appVersion: String) {
@@ -89,18 +93,38 @@ object BackupFormat {
                 },
             widths = listOf(10, 14, 22, 18, 18, 30, 10, 14, 14, 14, 8),
         )
+        // Contacts are linked by name, so two with the same name get "Ravi" and "Ravi (2)".
+        val contactNames = HashMap<Long, String>()
+        val usedNames = HashSet<String>()
+        for (c in data.contacts) {
+            var name = c.name.ifBlank { "?" }
+            var n = 2
+            while (!usedNames.add(name.lowercase(Locale.ROOT))) name = "${c.name} (${n++})"
+            contactNames[c.id] = name
+        }
+        w.sheet(
+            SHEET_CONTACTS,
+            listOf(listOf("Name", "Type", "Phone", "Email", "Address", "PAN / GSTIN", "Bank", "Account number", "IFSC", "UPI ID", "Reference", "Note")) +
+                data.contacts.map { c ->
+                    listOf(
+                        contactNames[c.id].orEmpty(), contactKindName(c.kind), c.phone, c.email, c.address, c.taxId, c.bankName,
+                        c.bankAccount, c.ifsc, c.upi, c.reference, c.note,
+                    )
+                },
+            widths = listOf(22, 10, 16, 26, 36, 18, 18, 20, 14, 22, 18, 30),
+        )
         w.sheet(
             SHEET_LOANS,
-            listOf(listOf("Name", "Direction", "Start date", "Interest %", "Rate per", "Plan", "Instalments", "Instalment amount", "Note", "Closed")) +
+            listOf(listOf("Name", "Direction", "Start date", "Interest %", "Rate per", "Plan", "Instalments", "Instalment amount", "Note", "Closed", "Contact")) +
                 data.loans.map { l ->
                     listOf(
                         loanAccounts[l.id].orEmpty(), directionName(l.direction), l.startDate,
                         java.math.BigDecimal.valueOf(l.rate, 2).stripTrailingZeros().toPlainString(), rateUnitName(l.rateUnit), planName(l.plan),
                         if (l.plan == LoanPlan.MONTHLY) l.installments.toString() else "", if (l.plan == LoanPlan.MONTHLY) MoneyCell(l.installment) else null,
-                        l.note, if (l.closed) "Yes" else "",
+                        l.note, if (l.closed) "Yes" else "", l.contactId?.let { contactNames[it] }.orEmpty(),
                     )
                 },
-            widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8),
+            widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8, 22),
         )
         w.sheet(
             "About",
@@ -193,4 +217,14 @@ object BackupFormat {
     }
 
     fun parsePlan(text: String): LoanPlan = if (text.trim().equals("monthly", true)) LoanPlan.MONTHLY else LoanPlan.FLEXIBLE
+
+    fun contactKindName(k: ContactKind) = when (k) {
+        ContactKind.PERSON -> "Person"
+        ContactKind.BANK -> "Bank"
+        ContactKind.COMPANY -> "Company"
+        ContactKind.VENDOR -> "Vendor"
+        ContactKind.SELF -> "Me"
+    }
+
+    fun parseContactKind(text: String): ContactKind = ContactKind.entries.firstOrNull { contactKindName(it).equals(text.trim(), true) } ?: ContactKind.PERSON
 }

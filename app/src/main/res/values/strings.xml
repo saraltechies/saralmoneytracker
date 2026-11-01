@@ -484,6 +484,111 @@
     <string name="statement_total_to_pay">Total to pay: %1$s</string>
     <string name="statement_footer">Sent from Saral Money Tracker</string>
 
+    <!-- The name under the launcher icon: short enough not to be cut off. -->
+    <string name="launcher_name">Saral Money</string>
+
+    <!-- Contacts: who a loan is with, and your own details -->
+    <string name="contact_name">Name</string>
+    <string name="contact_details">Contact details</string>
+    <string name="contact_details_hint">Optional. They appear on the statement you send, so it\'s clear who it\'s for.</string>
+    <string name="contact_add_details">Add phone, email, bank…</string>
+    <string name="contact_hide_details">Hide details</string>
+    <string name="contact_pick">From contacts</string>
+    <string name="contact_choose_saved">Choose a saved contact</string>
+    <string name="contact_phone">Phone</string>
+    <string name="contact_email">Email</string>
+    <string name="contact_address">Address</string>
+    <string name="contact_tax_id">PAN or GSTIN</string>
+    <string name="contact_bank_section">Bank and UPI</string>
+    <string name="contact_bank">Bank name</string>
+    <string name="contact_bank_account">Account number</string>
+    <string name="contact_ifsc">IFSC</string>
+    <string name="contact_upi">UPI ID</string>
+    <string name="contact_reference">Loan account or reference no.</string>
+    <string name="contact_check_format">Check this, it doesn\'t look right</string>
+    <string name="contact_kind_person">Person</string>
+    <string name="contact_kind_bank">Bank</string>
+    <string name="contact_kind_company">Finance company</string>
+    <string name="contact_kind_vendor">Vendor</string>
+    <string name="contact_kind_self">Me</string>
+    <string name="error_email">Check the email address</string>
+    <string name="error_upi">Check the UPI ID (like name@bank)</string>
+    <string name="my_details">Your details</string>
+    <string name="my_details_summary">Name, address, bank and UPI for loan statements</string>
+    <string name="my_details_intro">These appear at the top of the loan statements you send, with your bank and UPI details so people know where to pay you. They stay on this phone.</string>
+    <string name="my_details_name">Your name or business name</string>
+
+    <!-- Loan statements -->
+    <string name="loan_statement">Statement</string>
+    <string name="statement_title_dialog">Loan statement</string>
+    <string name="statement_add_my_details">Add your name, address and bank or UPI details so they appear on the statement. Tap here.</string>
+    <string name="statement_period">Period</string>
+    <string name="statement_all">Whole loan</string>
+    <string name="statement_this_fy">This financial year</string>
+    <string name="statement_last_fy">Last financial year</string>
+    <string name="statement_include_plan">Include the EMI plan</string>
+    <string name="statement_include_qr">Include a UPI \"scan to pay\" code</string>
+    <string name="statement_qr_needs_upi">Add your UPI ID in Your details to include a scan to pay code. Tap here.</string>
+    <string name="statement_qr_inr_only">A scan to pay code works with rupees (INR) only.</string>
+    <string name="statement_email_hint">Mail apps will fill in %1$s as the recipient.</string>
+    <string name="statement_share_pdf">Share PDF</string>
+    <string name="statement_save_pdf">Save PDF</string>
+    <string name="statement_share_text">Share as text instead</string>
+    <string name="statement_share_title">Send statement</string>
+    <string name="statement_saved">Statement saved</string>
+    <string name="statement_failed">Couldn\'t make the statement. Please try again.</string>
+    <string name="statement_email_subject">Loan statement: %1$s (as on %2$s)</string>
+    <string name="statement_email_body_lent">Dear %1$s,\n\nPlease find attached the statement of the loan as on %2$s. The amount outstanding is %3$s.\n\nPlease let me know if anything doesn\'t match your records.\n\nRegards,\n%4$s</string>
+    <string name="statement_email_body_borrowed">Dear %1$s,\n\nPlease find attached the statement of the loan as on %2$s, as per my records. The amount outstanding is %3$s.\n\nPlease let me know if anything doesn\'t match your records.\n\nRegards,\n%4$s</string>
+    <string name="statement_total_to_receive_label">Total outstanding (to receive)</string>
+    <string name="statement_total_to_pay_label">Total outstanding (to pay)</string>
+
+    <!-- The PDF statement -->
+    <string name="pdf_title">Loan statement</string>
+    <string name="pdf_file_name">%1$s loan statement %2$s</string>
+    <string name="pdf_period">Period: %1$s to %2$s</string>
+    <string name="pdf_date">Date: %1$s</string>
+    <string name="pdf_page">Page %1$d</string>
+    <string name="pdf_footer">Prepared with Saral Money Tracker on %1$s</string>
+    <string name="pdf_borrower">Borrower</string>
+    <string name="pdf_lender">Lender</string>
+    <string name="pdf_loan_details">Loan details</string>
+    <string name="pdf_loan_type">Type</string>
+    <string name="pdf_money_lent">Money lent</string>
+    <string name="pdf_money_borrowed">Money borrowed</string>
+    <string name="pdf_start_date">Start date</string>
+    <string name="pdf_interest">Interest</string>
+    <string name="pdf_repayment">Repayment</string>
+    <string name="pdf_emi_plan">%1$s × %2$d months</string>
+    <string name="pdf_interest_charged">Interest charged</string>
+    <string name="pdf_next_due_line">Next payment: %1$s on %2$s</string>
+    <string name="pdf_overdue_line">Overdue: %1$s (as on %2$s)</string>
+    <string name="pdf_entries">Entries</string>
+    <string name="pdf_col_date">Date</string>
+    <string name="pdf_col_particulars">Particulars</string>
+    <string name="pdf_col_amount">Amount</string>
+    <string name="pdf_col_due_date">Due date</string>
+    <string name="pdf_col_emi">EMI</string>
+    <string name="pdf_col_principal">Principal</string>
+    <string name="pdf_col_interest">Interest</string>
+    <string name="pdf_col_status">Status</string>
+    <string name="pdf_brought_forward">Balance brought forward</string>
+    <string name="pdf_closing_balance">Closing balance</string>
+    <string name="pdf_no_entries">No entries in this period</string>
+    <string name="pdf_status_late">Not paid</string>
+    <string name="pdf_status_upcoming">Upcoming</string>
+    <string name="pdf_how_to_pay">How to pay</string>
+    <string name="pdf_pay_to">Pay to: %1$s</string>
+    <string name="pdf_scan_to_pay">Scan to pay %1$s</string>
+    <string name="pdf_upi_note">Loan repayment %1$s</string>
+    <string name="pdf_reference">Reference</string>
+    <string name="pdf_tax_id">PAN / GSTIN: %1$s</string>
+    <string name="pdf_account_short">A/c %1$s</string>
+    <string name="pdf_ifsc_short">IFSC %1$s</string>
+    <string name="pdf_upi_short">UPI: %1$s</string>
+    <string name="pdf_sender_fallback">the sender</string>
+    <string name="pdf_closing_note">This statement was prepared by %1$s from their own records. If anything here doesn\'t match yours, please get in touch.</string>
+
     <string-array name="default_expense_categories">
         <item>Food &amp; Dining</item>
         <item>Groceries</item>

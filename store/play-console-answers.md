@@ -1,7 +1,7 @@
 # Play Console answers for Saral Money Tracker
 
 Answers for every declaration in **Policy → App content**, plus the release setup.
-They match the code as of v1.1.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
+They match the code as of v1.2.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
 (the manifest removes it and the release workflow fails if it appears).
 **Re-check them whenever you add an SDK or a permission.**
 
@@ -56,6 +56,8 @@ They match the code as of v1.1.0: no ads, no analytics, no crash reporting, and 
 
 ## Permissions
 No sensitive-permission declarations are needed: notifications, run at startup and biometrics are normal permissions.
+Picking a contact for a loan uses the system picker (`ACTION_PICK`), which shares only the chosen entry; there is no
+`READ_CONTACTS` permission. Contact details and statements stay on the phone and leave it only when the user shares a PDF.
 The app does not use SMS, call log, location, contacts or all-files access.
 
 ## Store settings
@@ -71,7 +73,18 @@ The app does not use SMS, call log, location, contacts or all-files access.
   `C6:3B:B0:55:85:E0:D3:84:DF:58:25:64:36:B6:28:06:C0:25:33:6B:3B:23:56:4A:C6:57:B8:C0:14:1C:A1:FA`
 - Deobfuscation file: nothing to do. The build puts `mapping.txt` inside the AAB and Play picks it up (App bundle
   explorer → Downloads shows it as "ReTrace mapping file").
-- Release name: `1.1.0 (2)` (1.0.0 was `1.0.0 (1)`)
+- Release name: `1.2.0 (3)` (earlier: `1.1.0 (2)`, `1.0.0 (1)`)
+- Release notes for 1.2.0 (en-IN):
+  ```
+  <en-IN>
+  New: PDF loan statements.
+  • Send a statement with the running balance, EMI plan and a UPI scan-to-pay code
+  • Save full details for each person, bank or vendor: phone, email, address, bank and UPI
+  • Add your own details once; they appear on every statement
+  • Pick name and number straight from your contacts
+  Also: the name under the icon is now Saral Money.
+  </en-IN>
+  ```
 - Release notes for 1.1.0 (en-IN):
   ```
   <en-IN>

@@ -4,6 +4,8 @@ import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
+import com.saraltechies.saralmoneytracker.model.Contact
+import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Loan
 import com.saraltechies.saralmoneytracker.model.LoanDirection
@@ -192,6 +194,36 @@ class SpreadsheetImportTest {
         assertEquals(-2_000_000L, result.accounts.single { it.name == "Meena" }.opening)
         // The interest entry names its loan, so it's linked again on import.
         assertEquals("Ravi", result.rows.single { it.type == TxnType.INCOME }.loan)
+    }
+
+    @Test
+    fun backupKeepsContacts() {
+        val accounts = listOf(Account(id = 5, name = "Ravi", type = AccountType.LOAN), Account(id = 6, name = "HDFC Bank", type = AccountType.LOAN))
+        val contacts = listOf(
+            Contact(id = 1, name = "Me", kind = ContactKind.SELF, upi = "me@okhdfc", address = "12 MG Road, Amroha"),
+            Contact(id = 2, name = "Ravi", phone = "+91 98765 43210", email = "ravi@example.com", bankAccount = "001234567890", ifsc = "HDFC0001234"),
+            Contact(id = 3, name = "HDFC Bank", kind = ContactKind.BANK, reference = "LN/2026/778"),
+        )
+        val loans = listOf(
+            Loan(id = 1, accountId = 5, direction = LoanDirection.LENT, startDate = d("2026-01-05"), contactId = 2),
+            Loan(id = 2, accountId = 6, direction = LoanDirection.BORROWED, startDate = d("2026-02-01"), contactId = 3),
+        )
+        val out = ByteArrayOutputStream()
+        BackupFormat.writeXlsx(BackupFormat.Data(accounts, emptyList(), emptyList(), emptyList(), loans, contacts), out, d("2026-03-01"), "1.2.0")
+        val result = SpreadsheetImport.read(XlsxReader.read(ByteArrayInputStream(out.toByteArray())))
+
+        assertEquals(3, result.contacts.size)
+        val me = result.contacts.single { it.kind == ContactKind.SELF }
+        assertEquals("me@okhdfc", me.upi)
+        assertEquals("12 MG Road, Amroha", me.address)
+        val ravi = result.contacts.single { it.name == "Ravi" }
+        assertEquals("+91 98765 43210", ravi.phone)
+        assertEquals("ravi@example.com", ravi.email)
+        assertEquals("001234567890", ravi.bankAccount)
+        assertEquals("HDFC0001234", ravi.ifsc)
+        assertEquals(ContactKind.BANK, result.contacts.single { it.name == "HDFC Bank" }.kind)
+        assertEquals("LN/2026/778", result.contacts.single { it.name == "HDFC Bank" }.reference)
+        assertEquals(listOf("Ravi", "HDFC Bank"), result.loans.map { it.contact })
     }
 
     @Test

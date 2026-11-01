@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.5.0. Re-check before each release.
+Every claim below matches the code as of 1.6.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -14,7 +14,6 @@ Saral Money Tracker is a simple, private way to track your income and expenses. 
 ADD AN ENTRY IN SECONDS
 • A keypad that adds up sums for you: type 250+120+45 and save ₹415
 • Your most used categories come first, with More and a search for the rest; your last used account is chosen for you
-• Today and Yesterday shortcuts, or any date
 • Notes, and search across every note and category
 
 DAILY, WEEKLY, MONTHLY AND YEARLY VIEWS
@@ -36,13 +35,12 @@ ACCOUNTS AND CREDIT CARDS, DONE RIGHT
 • Paying a credit card bill or withdrawing cash is a transfer, so it's never counted as spending twice
 
 LENT AND BORROWED MONEY
-• Track money you gave to friends and family, or took from them, on credit or on interest
+• Money you gave to or took from friends and family, on credit or on interest
 • Interest per month (like 2% a month) or per year, on what is still owed
 • Paid back any time, or as a monthly EMI with the full plan worked out
 • See who owes what, interest due, the next payment and anything overdue
 • Full details for each person, bank or vendor: phone, email, address, PAN/GSTIN, bank and UPI
 • Send a PDF loan statement with the running balance, EMI plan and a UPI scan-to-pay code
-• A reminder on the day a payment is due
 
 PERSONAL AND BUSINESS, KEPT APART
 • Run a shop or a business? Keep its money in its own book, apart from yours
@@ -53,9 +51,14 @@ PERSONAL AND BUSINESS, KEPT APART
 
 CREDIT LEDGER FOR CUSTOMERS AND SUPPLIERS
 • Record what you gave and got on credit in two taps, with a running balance for each person
-• Sales and purchases on credit are counted once; payments aren't counted again
 • Send a payment reminder on WhatsApp or SMS, with your UPI ID
 • PDF account statement with a UPI scan-to-pay code
+• Credit period for each customer: see what is overdue and since when
+• Repeat an entry weekly or monthly, like rent from a tenant
+
+CASH FLOW AHEAD
+• Your expected balance at month end, or in 30 or 90 days
+• From repeating bills, EMIs and customer dues; warns if money will run short
 
 REPEATING ENTRIES
 • Add salary, rent, EMIs, SIPs and subscriptions once
@@ -63,7 +66,7 @@ REPEATING ENTRIES
 
 BRING YOUR EXCEL SHEET
 • Import your old expense tracker, including monthly "Money Out / Money In" sheets
-• Also reads any table with Date and Amount columns, and bank statements with Debit and Credit columns
+• Also reads bank statements with Debit and Credit columns
 • Export everything to Excel (a full backup you can import again) or CSV
 
 PRIVATE AND SECURE
@@ -76,11 +79,11 @@ ALSO
 • 29 currencies, with Indian number format for rupees (₹1,25,000)
 • Your own categories with 49 icons and 20 colours
 • Optional daily reminder, only on days you haven't added anything
+• Morning alerts for bills coming up and payments due, and a monthly summary
 • Home-screen widget and a quick-settings tile to add an expense in a tap
 • Light and dark themes, launcher shortcuts for Add expense, Add income and Transfer
 
 Made in India by Saral Techies (saraltechies.com).
-Questions or ideas? Write to us. We read every message.
 
 ## Category
 Finance

@@ -73,7 +73,7 @@ class StoreScreenshotsTest {
             settle()
 
             click(s(R.string.loans_title))
-            click("Punjab National Bank")
+            click("PNB term loan")
             shot("5-loan-emi")
             back()
             back()
@@ -172,6 +172,28 @@ class StoreScreenshotsTest {
         repo.saveTxn(Txn(type = TxnType.EXPENSE, amount = rupees(1_200), date = today, categoryId = transport, accountId = cash.id, note = "Tempo for delivery"))
         repo.saveTxn(Txn(type = TxnType.EXPENSE, amount = rupees(399), date = today, categoryId = phone, accountId = bank.id, note = "Shop mobile recharge"))
 
+        // Last month in full, so Stats can compare with it.
+        val lastStart = monthStart.minusMonths(1)
+        d = lastStart
+        i = 3
+        while (d.isBefore(monthStart)) {
+            repo.saveTxn(Txn(type = TxnType.INCOME, amount = rupees(daily[i % daily.size] - 350), date = d, categoryId = sales, accountId = if (i % 3 == 0) bank.id else cash.id, note = "Counter sales"))
+            d = d.plusDays(1)
+            i++
+        }
+        repo.saveTxn(Txn(type = TxnType.EXPENSE, amount = rupees(1_18_400), date = lastStart, categoryId = purchases, accountId = bank.id, note = "Stock for Diwali"))
+        repo.saveTxn(Txn(type = TxnType.EXPENSE, amount = rupees(15_000), date = lastStart, categoryId = rent, accountId = bank.id, note = "Shop rent"))
+        repo.saveTxn(Txn(type = TxnType.EXPENSE, amount = rupees(2_860), date = lastStart.plusDays(4), categoryId = power, accountId = bank.id, note = "Electricity bill"))
+        repo.saveTxn(Txn(type = TxnType.EXPENSE, amount = rupees(12_000), date = lastStart.plusDays(25), categoryId = wages, accountId = bank.id, note = "Staff salary"))
+        repo.saveTxn(Txn(type = TxnType.EXPENSE, amount = rupees(3_450), date = lastStart.plusDays(12), categoryId = transport, accountId = cash.id, note = "Deliveries"))
+
+        // Monthly budgets for the shop.
+        repo.setBudget(purchases, rupees(80_000))
+        repo.setBudget(rent, rupees(15_000))
+        repo.setBudget(power, rupees(3_000))
+        repo.setBudget(wages, rupees(12_000))
+        repo.setBudget(transport, rupees(3_000))
+
         // Repeating: staff salary and rent, with a reminder 3 days before.
         val nextMonth = monthStart.plusMonths(1)
         repo.saveRecurring(
@@ -201,7 +223,7 @@ class StoreScreenshotsTest {
         val emi = LoanMath.emi(rupees(3_00_000), LoanMath.monthlyRate(1150, RateUnit.YEAR), 36)
         val loanId = repo.createLoan(
             LoanTerms(
-                name = "Punjab National Bank", direction = LoanDirection.BORROWED, startDate = start, rate = 1150, rateUnit = RateUnit.YEAR,
+                name = "PNB term loan", direction = LoanDirection.BORROWED, startDate = start, rate = 1150, rateUnit = RateUnit.YEAR,
                 plan = LoanPlan.MONTHLY, installments = 36, installment = emi, note = "Business term loan", bookId = shop,
             ),
             rupees(3_00_000), bank.id,

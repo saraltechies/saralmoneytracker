@@ -2,6 +2,7 @@ package com.saraltechies.saralmoneytracker
 
 import android.graphics.Bitmap
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
@@ -100,7 +101,7 @@ class StoreScreenshotsTest {
     }
 
     private fun click(text: String, substring: Boolean = false) {
-        val matcher = hasText(text, substring = substring) and hasClickAction()
+        val matcher = (hasText(text, substring = substring) or hasContentDescription(text, substring = substring)) and hasClickAction()
         try {
             compose.waitUntil(8_000) { compose.onAllNodes(matcher, useUnmergedTree = false).fetchSemanticsNodes().isNotEmpty() }
         } catch (e: Throwable) {

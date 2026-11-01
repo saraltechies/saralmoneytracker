@@ -45,6 +45,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -183,7 +185,9 @@ fun HomeScreen(
         bottomBar = bottomBar,
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
+            val addLabel = stringResource(R.string.add_entry)
             ExtendedFloatingActionButton(
+                modifier = Modifier.semantics { contentDescription = addLabel },
                 onClick = { onAdd(TxnType.EXPENSE) },
                 icon = { Icon(Icons.Filled.Add, null) },
                 text = { Text(stringResource(R.string.add_entry)) },

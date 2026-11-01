@@ -4,6 +4,10 @@ import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Frequency
+import com.saraltechies.saralmoneytracker.model.Loan
+import com.saraltechies.saralmoneytracker.model.LoanDirection
+import com.saraltechies.saralmoneytracker.model.LoanPlan
+import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
@@ -23,8 +27,9 @@ object BackupFormat {
     const val SHEET_ACCOUNTS = "Accounts"
     const val SHEET_CATEGORIES = "Categories"
     const val SHEET_RECURRING = "Recurring"
+    const val SHEET_LOANS = "Loans"
 
-    private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note")
+    private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note", "Loan")
 
     fun isBackupHeader(sheet: XSheet): Boolean {
         val header = sheet.rows[0]?.values?.map { it.text.trim().lowercase(Locale.ROOT) }.orEmpty()
@@ -36,21 +41,24 @@ object BackupFormat {
         val categories: List<Category>,
         val txns: List<Txn>,
         val recurring: List<Recurring>,
+        val loans: List<Loan> = emptyList(),
     )
 
     fun writeXlsx(data: Data, out: OutputStream, exportedOn: LocalDate, appVersion: String) {
         val acc = data.accounts.associateBy { it.id }
         val cat = data.categories.associateBy { it.id }
+        val loanAccounts = data.loans.associate { it.id to acc[it.accountId]?.name.orEmpty() }
+        fun loanName(t: Txn) = t.loanId?.let { loanAccounts[it] }.orEmpty()
         val w = XlsxWriter()
         w.sheet(
             SHEET_TRANSACTIONS,
             listOf(TX_HEADER) + data.txns.sortedWith(compareBy({ it.date }, { it.createdAt })).map { t ->
                 listOf(
                     t.date, typeName(t.type), MoneyCell(t.amount), t.categoryId?.let { cat[it]?.name }.orEmpty(),
-                    acc[t.accountId]?.name.orEmpty(), t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note,
+                    acc[t.accountId]?.name.orEmpty(), t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t),
                 )
             },
-            widths = listOf(14, 10, 14, 22, 18, 18, 40),
+            widths = listOf(14, 10, 14, 22, 18, 18, 40, 18),
         )
         w.sheet(
             SHEET_ACCOUNTS,
@@ -82,6 +90,19 @@ object BackupFormat {
             widths = listOf(10, 14, 22, 18, 18, 30, 10, 14, 14, 14, 8),
         )
         w.sheet(
+            SHEET_LOANS,
+            listOf(listOf("Name", "Direction", "Start date", "Interest %", "Rate per", "Plan", "Instalments", "Instalment amount", "Note", "Closed")) +
+                data.loans.map { l ->
+                    listOf(
+                        loanAccounts[l.id].orEmpty(), directionName(l.direction), l.startDate,
+                        java.math.BigDecimal.valueOf(l.rate, 2).stripTrailingZeros().toPlainString(), rateUnitName(l.rateUnit), planName(l.plan),
+                        if (l.plan == LoanPlan.MONTHLY) l.installments.toString() else "", if (l.plan == LoanPlan.MONTHLY) MoneyCell(l.installment) else null,
+                        l.note, if (l.closed) "Yes" else "",
+                    )
+                },
+            widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8),
+        )
+        w.sheet(
             "About",
             listOf(
                 listOf("Saral Money Tracker export"),
@@ -98,12 +119,14 @@ object BackupFormat {
     fun writeCsv(data: Data, out: Writer) {
         val acc = data.accounts.associateBy { it.id }
         val cat = data.categories.associateBy { it.id }
+        val loanAccounts = data.loans.associate { it.id to acc[it.accountId]?.name.orEmpty() }
+        fun loanName(t: Txn) = t.loanId?.let { loanAccounts[it] }.orEmpty()
         out.write(TX_HEADER.joinToString(",") + "\r\n")
         for (t in data.txns.sortedWith(compareBy({ it.date }, { it.createdAt }))) {
             val fields = listOf(
                 t.date.toString(), typeName(t.type), java.math.BigDecimal.valueOf(t.amount, 2).toPlainString(),
                 t.categoryId?.let { cat[it]?.name }.orEmpty(), acc[t.accountId]?.name.orEmpty(),
-                t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note,
+                t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t),
             )
             out.write(fields.joinToString(",") { csv(it) } + "\r\n")
         }
@@ -135,6 +158,7 @@ object BackupFormat {
         AccountType.CARD -> "Card"
         AccountType.WALLET -> "Wallet"
         AccountType.OTHER -> "Other"
+        AccountType.LOAN -> "Loan"
     }
 
     fun parseAccountType(text: String): AccountType =
@@ -148,4 +172,25 @@ object BackupFormat {
     }
 
     fun parseFrequency(text: String): Frequency? = Frequency.entries.firstOrNull { frequencyName(it).equals(text.trim(), true) }
+
+    fun directionName(d: LoanDirection) = when (d) {
+        LoanDirection.LENT -> "Lent"
+        LoanDirection.BORROWED -> "Borrowed"
+    }
+
+    fun parseDirection(text: String): LoanDirection = if (text.trim().equals("borrowed", true)) LoanDirection.BORROWED else LoanDirection.LENT
+
+    fun rateUnitName(u: RateUnit) = when (u) {
+        RateUnit.MONTH -> "Month"
+        RateUnit.YEAR -> "Year"
+    }
+
+    fun parseRateUnit(text: String): RateUnit = if (text.trim().equals("year", true)) RateUnit.YEAR else RateUnit.MONTH
+
+    fun planName(p: LoanPlan) = when (p) {
+        LoanPlan.FLEXIBLE -> "Any time"
+        LoanPlan.MONTHLY -> "Monthly"
+    }
+
+    fun parsePlan(text: String): LoanPlan = if (text.trim().equals("monthly", true)) LoanPlan.MONTHLY else LoanPlan.FLEXIBLE
 }

@@ -11,13 +11,17 @@ import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.DefaultData
 import com.saraltechies.saralmoneytracker.model.Frequency
+import com.saraltechies.saralmoneytracker.model.Loan
+import com.saraltechies.saralmoneytracker.model.LoanDirection
+import com.saraltechies.saralmoneytracker.model.LoanPlan
+import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
 import java.time.LocalDate
 
 /**
- * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only four tables.
+ * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only five tables.
  * Dates are stored as epoch days, amounts as hundredths.
  */
 class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, null, VERSION) {
@@ -41,9 +45,10 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             """CREATE TABLE txns (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, amount INTEGER NOT NULL, day INTEGER NOT NULL,
                 category_id INTEGER, account_id INTEGER NOT NULL, to_account_id INTEGER, note TEXT NOT NULL DEFAULT '',
-                recurring_id INTEGER, created INTEGER NOT NULL)""",
+                recurring_id INTEGER, created INTEGER NOT NULL, loan_id INTEGER)""",
         )
         db.execSQL("CREATE INDEX txns_day ON txns(day)")
+        createLoans(db)
         db.execSQL(
             """CREATE TABLE recurring (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, amount INTEGER NOT NULL, category_id INTEGER,
@@ -53,7 +58,23 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         seed(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE txns ADD COLUMN loan_id INTEGER")
+            createLoans(db)
+        }
+    }
+
+    /** Version 2: money lent and borrowed. */
+    private fun createLoans(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE loans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, direction TEXT NOT NULL, start_day INTEGER NOT NULL,
+                rate INTEGER NOT NULL DEFAULT 0, rate_unit TEXT NOT NULL, plan TEXT NOT NULL, installments INTEGER NOT NULL DEFAULT 0,
+                installment INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '', closed INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL)""",
+        )
+        db.execSQL("CREATE INDEX txns_loan ON txns(loan_id)")
+    }
 
     fun seed(db: SQLiteDatabase) {
         val res = context.resources
@@ -69,11 +90,12 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
 
     companion object {
         const val NAME = "money.db"
-        const val VERSION = 1
+        const val VERSION = 2
         const val T_ACCOUNTS = "accounts"
         const val T_CATEGORIES = "categories"
         const val T_TXNS = "txns"
         const val T_RECURRING = "recurring"
+        const val T_LOANS = "loans"
 
         fun values(a: Account) = ContentValues().apply {
             if (a.id != 0L) put("id", a.id)
@@ -106,6 +128,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("note", t.note)
             if (t.recurringId != null) put("recurring_id", t.recurringId) else putNull("recurring_id")
             put("created", if (t.createdAt != 0L) t.createdAt else System.currentTimeMillis())
+            if (t.loanId != null) put("loan_id", t.loanId) else putNull("loan_id")
         }
 
         fun values(r: Recurring) = ContentValues().apply {
@@ -122,6 +145,36 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             if (r.endDate != null) put("end_day", r.endDate.toEpochDay()) else putNull("end_day")
             put("active", if (r.active) 1 else 0)
         }
+
+        fun values(l: Loan) = ContentValues().apply {
+            if (l.id != 0L) put("id", l.id)
+            put("account_id", l.accountId)
+            put("direction", l.direction.name)
+            put("start_day", l.startDate.toEpochDay())
+            put("rate", l.rate)
+            put("rate_unit", l.rateUnit.name)
+            put("plan", l.plan.name)
+            put("installments", l.installments)
+            put("installment", l.installment)
+            put("note", l.note)
+            put("closed", if (l.closed) 1 else 0)
+            put("created", if (l.createdAt != 0L) l.createdAt else System.currentTimeMillis())
+        }
+
+        fun loan(c: Cursor) = Loan(
+            id = c.long("id"),
+            accountId = c.long("account_id"),
+            direction = if (c.str("direction") == LoanDirection.BORROWED.name) LoanDirection.BORROWED else LoanDirection.LENT,
+            startDate = LocalDate.ofEpochDay(c.long("start_day")),
+            rate = c.long("rate"),
+            rateUnit = if (c.str("rate_unit") == RateUnit.YEAR.name) RateUnit.YEAR else RateUnit.MONTH,
+            plan = if (c.str("plan") == LoanPlan.MONTHLY.name) LoanPlan.MONTHLY else LoanPlan.FLEXIBLE,
+            installments = c.int("installments"),
+            installment = c.long("installment"),
+            note = c.str("note"),
+            closed = c.int("closed") != 0,
+            createdAt = c.long("created"),
+        )
 
         private fun Cursor.long(name: String) = getLong(getColumnIndexOrThrow(name))
         private fun Cursor.longOrNull(name: String) = getColumnIndexOrThrow(name).let { if (isNull(it)) null else getLong(it) }
@@ -159,6 +212,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             note = c.str("note"),
             recurringId = c.longOrNull("recurring_id"),
             createdAt = c.long("created"),
+            loanId = c.longOrNull("loan_id"),
         )
 
         fun recurring(c: Cursor) = Recurring(

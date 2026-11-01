@@ -17,7 +17,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -56,6 +58,7 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
 import com.saraltechies.saralmoneytracker.ui.components.IconBadge
@@ -75,10 +78,11 @@ fun AccountsScreen(
     bottomBar: @Composable () -> Unit,
     onOpenAccount: (Long) -> Unit,
     onTransfer: () -> Unit,
+    onOpenLoans: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val data by remember { repository.watch { repository.accounts(includeArchived = true) to repository.balances() } }
+    val data by remember { repository.watch { Triple(repository.accounts(includeArchived = true, includeLoans = true), repository.balances(), repository.loanItems()) } }
         .collectAsStateWithLifecycle(null)
     var editing by remember { mutableStateOf<Account?>(null) }
 
@@ -99,11 +103,15 @@ fun AccountsScreen(
             )
         },
     ) { padding ->
-        val (accounts, balances) = data ?: return@Scaffold
+        val (allAccounts, balances, loans) = data ?: return@Scaffold
+        // Loans have their own screen; open ones still count in net worth (money owed to you, or by you).
+        val accounts = allAccounts.filter { it.type != AccountType.LOAN }
+        val openLoanAccounts = loans.filter { !it.loan.closed }.map { it.loan.accountId }.toSet()
+        val loanBalances = allAccounts.filter { it.id in openLoanAccounts }.map { balances[it.id] ?: 0 }
         val active = accounts.filter { !it.archived }
         val hidden = accounts.filter { it.archived }
-        val assets = active.sumOf { (balances[it.id] ?: 0).coerceAtLeast(0) }
-        val owed = active.sumOf { (balances[it.id] ?: 0).coerceAtMost(0) }
+        val assets = active.sumOf { (balances[it.id] ?: 0).coerceAtLeast(0) } + loanBalances.sumOf { it.coerceAtLeast(0) }
+        val owed = active.sumOf { (balances[it.id] ?: 0).coerceAtMost(0) } + loanBalances.sumOf { it.coerceAtMost(0) }
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 88.dp)) {
             item {
                 Card(
@@ -136,6 +144,27 @@ fun AccountsScreen(
                 )
             }
             items(active, key = { it.id }) { a -> AccountRow(a, balances[a.id] ?: 0, onClick = { onOpenAccount(a.id) }, onEdit = { editing = a }) }
+            item {
+                val open = loans.filter { !it.loan.closed }
+                val toReceive = open.filter { it.loan.direction == LoanDirection.LENT }.sumOf { it.summary.outstanding }
+                val toPay = open.filter { it.loan.direction == LoanDirection.BORROWED }.sumOf { it.summary.outstanding }
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onOpenLoans).padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconBadge(Icons.Filled.Handshake, MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.loans_title), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            if (open.isEmpty()) stringResource(R.string.loans_row_empty)
+                            else stringResource(R.string.loans_row_summary, money(toReceive), money(toPay)),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             if (hidden.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.hidden_accounts)) }
                 items(hidden, key = { it.id }) { a ->
@@ -193,7 +222,7 @@ private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Acco
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AccountType.entries.forEach { t ->
+                    AccountType.entries.filter { it != AccountType.LOAN }.forEach { t ->
                         FilterChip(selected = type == t, onClick = { type = t }, label = { Text(stringResource(accountTypeLabel(t))) })
                     }
                 }

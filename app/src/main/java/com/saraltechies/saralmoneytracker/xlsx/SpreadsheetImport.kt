@@ -2,6 +2,9 @@ package com.saraltechies.saralmoneytracker.xlsx
 
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Frequency
+import com.saraltechies.saralmoneytracker.model.LoanDirection
+import com.saraltechies.saralmoneytracker.model.LoanPlan
+import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.TxnType
 import java.time.LocalDate
@@ -19,6 +22,21 @@ data class ImportedRow(
     val note: String,
     val account: String? = null,
     val toAccount: String? = null,
+    /** The loan (by its account name) this entry belongs to, from our own export. */
+    val loan: String? = null,
+)
+
+data class ImportedLoan(
+    val name: String,
+    val direction: LoanDirection,
+    val startDate: LocalDate,
+    val rate: Long,
+    val rateUnit: RateUnit,
+    val plan: LoanPlan,
+    val installments: Int,
+    val installment: Long,
+    val note: String,
+    val closed: Boolean,
 )
 
 data class ImportedAccount(val name: String, val type: AccountType, val opening: Long, val archived: Boolean = false)
@@ -57,8 +75,9 @@ data class ImportResult(
     val sheetsRead: List<String>,
     /** True when the file is a Saral Money Tracker export (a full backup). */
     val isBackup: Boolean,
+    val loans: List<ImportedLoan> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = rows.isEmpty() && accounts.isEmpty() && categories.isEmpty() && recurring.isEmpty()
+    val isEmpty: Boolean get() = rows.isEmpty() && accounts.isEmpty() && categories.isEmpty() && recurring.isEmpty() && loans.isEmpty()
 }
 
 /**
@@ -97,6 +116,7 @@ object SpreadsheetImport {
                     note = text(s, r, h["note"]),
                     account = text(s, r, h["account"]).ifEmpty { null },
                     toAccount = text(s, r, h["to account"]).ifEmpty { null },
+                    loan = text(s, r, h["loan"]).ifEmpty { null },
                 )
             }
         }
@@ -145,8 +165,27 @@ object SpreadsheetImport {
                 )
             }
         }.orEmpty()
+        val loans = sheet(BackupFormat.SHEET_LOANS)?.let { s ->
+            val h = headerIndex(s, 0)
+            (1..s.lastRow).mapNotNull { r ->
+                val name = text(s, r, h["name"]).ifEmpty { return@mapNotNull null }
+                ImportedLoan(
+                    name = name,
+                    direction = BackupFormat.parseDirection(text(s, r, h["direction"])),
+                    startDate = date(s.cell(r, h["start date"] ?: -1)) ?: return@mapNotNull null,
+                    // "2" or "1.5" percent, read like an amount: hundredths of a percent.
+                    rate = amount(s.cell(r, h["interest %"] ?: -1))?.absoluteValue ?: 0,
+                    rateUnit = BackupFormat.parseRateUnit(text(s, r, h["rate per"])),
+                    plan = BackupFormat.parsePlan(text(s, r, h["plan"])),
+                    installments = text(s, r, h["instalments"]).toIntOrNull() ?: 0,
+                    installment = amount(s.cell(r, h["instalment amount"] ?: -1))?.absoluteValue ?: 0,
+                    note = text(s, r, h["note"]),
+                    closed = text(s, r, h["closed"]).equals("yes", true),
+                )
+            }
+        }.orEmpty()
         val (unique, duplicates) = dedupe(rows)
-        return ImportResult(unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true)
+        return ImportResult(unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true, loans = loans)
     }
 
     // ---- Hand-made trackers and statements ----------------------------------------------------------------

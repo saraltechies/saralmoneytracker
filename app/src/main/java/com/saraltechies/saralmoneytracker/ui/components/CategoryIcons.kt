@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.House
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Redeem
@@ -113,6 +115,8 @@ object CategoryIcons {
         "refund" to Icons.Filled.Replay,
         "redeem" to Icons.Filled.Redeem,
         "wallet" to Icons.Filled.AccountBalanceWallet,
+        "interest" to Icons.Filled.Percent,
+        "lend" to Icons.Filled.Handshake,
         "other" to Icons.Filled.MoreHoriz,
     )
 
@@ -126,6 +130,7 @@ object CategoryIcons {
         AccountType.CARD -> Icons.Filled.CreditCard
         AccountType.WALLET -> Icons.Filled.AccountBalanceWallet
         AccountType.OTHER -> Icons.Filled.Savings
+        AccountType.LOAN -> Icons.Filled.Handshake
     }
 }
 

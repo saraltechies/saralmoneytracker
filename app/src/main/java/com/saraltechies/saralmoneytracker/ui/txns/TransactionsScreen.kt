@@ -85,7 +85,7 @@ fun TransactionsScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var typeFilter by rememberSaveable { mutableStateOf<TxnType?>(null) }
 
-    val lookups by remember { repository.watch { Lookups(repository.categories(true), repository.accounts(true)) } }
+    val lookups by remember { repository.watch { Lookups(repository.categories(true), repository.accounts(true), repository.loanDirections()) } }
         .collectAsStateWithLifecycle(Lookups(emptyList(), emptyList()))
     val searchText = query.trim().takeIf { searching && it.isNotEmpty() }
     val txns by remember(period, searchText, accountId, categoryId) {

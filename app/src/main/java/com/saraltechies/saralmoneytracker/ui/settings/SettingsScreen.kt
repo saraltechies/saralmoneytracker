@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
@@ -228,7 +227,6 @@ fun SettingsScreen(
                     context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
                 }
             }
-            item { Setting(Icons.Filled.Code, stringResource(R.string.source_code), stringResource(R.string.source_code_summary)) { PlayStore.openUrl(context, PlayStore.SOURCE_CODE) } }
             item { Setting(Icons.Filled.Policy, stringResource(R.string.privacy_policy), null) { PlayStore.openUrl(context, PlayStore.PRIVACY_POLICY) } }
             item { SectionTitle(stringResource(R.string.more_apps)) }
             item { Setting(Icons.Filled.Folder, stringResource(R.string.app_file_manager), stringResource(R.string.app_file_manager_summary)) { PlayStore.openListing(context, PlayStore.SARAL_FILE_MANAGER) } }

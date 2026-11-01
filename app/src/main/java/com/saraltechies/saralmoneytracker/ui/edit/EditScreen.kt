@@ -5,8 +5,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -27,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -39,6 +45,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -110,6 +118,7 @@ fun EditScreen(
     onBack: () -> Unit,
     onDeleted: (Txn) -> Unit,
     onManageCategories: () -> Unit,
+    onOpenLoan: (Long) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
@@ -146,6 +155,11 @@ fun EditScreen(
             )
         }
         when {
+            // Loan entries are changed on the loan's own screen, where the interest and balance are worked out.
+            txn?.loanId != null -> {
+                onOpenLoan(txn.loanId)
+                return@LaunchedEffect
+            }
             txn != null -> {
                 original = txn
                 type = txn.type
@@ -168,8 +182,9 @@ fun EditScreen(
                 repeat = rule.frequency
             }
             else -> {
-                val last = recent.firstOrNull { it.type == type }
-                accountId = last?.accountId ?: recent.firstOrNull()?.accountId
+                val own = recent.filter { it.loanId == null }
+                val last = own.firstOrNull { it.type == type }
+                accountId = last?.accountId ?: own.firstOrNull()?.accountId
                 toAccountId = last?.toAccountId
                 categoryId = last?.categoryId
                 if (isRule) repeat = Frequency.MONTHLY
@@ -179,6 +194,10 @@ fun EditScreen(
     }
 
     val kindCategories = categories.filter { it.kind == type }
+    // The categories you use most come first, so the usual one is a tap away and the full list stays out of the way.
+    val usage by remember(type) { repository.watch { repository.categoryUsage(type, LocalDate.now().minusDays(120)) } }
+        .collectAsStateWithLifecycle(emptyMap())
+    var allCategories by remember { mutableStateOf(false) }
     // Keep a valid category for the current type.
     LaunchedEffect(type, categories, loaded) {
         if (!loaded || type == TxnType.TRANSFER || categories.isEmpty()) return@LaunchedEffect
@@ -282,7 +301,7 @@ fun EditScreen(
                             Text(stringResource(R.string.manage))
                         }
                     }
-                    CategoryGrid(kindCategories, categoryId) { categoryId = it; error = null }
+                    QuickCategories(kindCategories, usage, categoryId, onMore = { allCategories = true }) { categoryId = it; error = null }
                     HorizontalDivider(Modifier.padding(top = 8.dp))
                 }
                 AccountRows(type, accounts, accountId, toAccountId, onPickFrom = { pickAccount = 1 }, onPickTo = { pickAccount = 2 }, onSwap = {
@@ -343,6 +362,15 @@ fun EditScreen(
             onDismiss = { pickAccount = 0 },
         )
     }
+    if (allCategories) {
+        CategorySheet(
+            categories = kindCategories,
+            selected = categoryId,
+            onSelect = { categoryId = it; error = null },
+            onManage = { allCategories = false; onManageCategories() },
+            onDismiss = { allCategories = false },
+        )
+    }
     if (pickRepeat) {
         val options: List<Frequency?> = (if (isRule) emptyList() else listOf<Frequency?>(null)) + Frequency.entries
         ChoiceDialog(
@@ -391,33 +419,116 @@ private fun AmountDisplay(expr: String, amount: Long?, color: Color) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** How many categories the entry form shows before "More". Two rows of four. */
+private const val QUICK_COUNT = 8
+
+/**
+ * Your most used categories as two short rows, with "More" for the rest. The chosen category is always shown, so
+ * picking one from the full list keeps it in view.
+ */
 @Composable
-private fun CategoryGrid(categories: List<Category>, selected: Long?, onSelect: (Long) -> Unit) {
-    FlowRow(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        for (c in categories) {
-            val isSelected = c.id == selected
-            val tint = Color(c.color)
-            Column(
-                Modifier
-                    .width(78.dp)
-                    .background(if (isSelected) tint.copy(alpha = 0.14f) else Color.Transparent, RoundedCornerShape(12.dp))
-                    .border(if (isSelected) 1.5.dp else 0.dp, if (isSelected) tint else Color.Transparent, RoundedCornerShape(12.dp))
-                    .clickable { onSelect(c.id) }
-                    .padding(vertical = 8.dp, horizontal = 2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                IconBadge(CategoryIcons.of(c.icon), tint, size = 36.dp)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    c.name, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center,
-                    overflow = TextOverflow.Ellipsis, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                )
+private fun QuickCategories(categories: List<Category>, usage: Map<Long, Int>, selected: Long?, onMore: () -> Unit, onSelect: (Long) -> Unit) {
+    val needsMore = categories.size > QUICK_COUNT
+    val shown = if (!needsMore) categories else {
+        // Most used first; ties keep your own order from Manage categories.
+        val ranked = categories.withIndex().sortedWith(compareByDescending<IndexedValue<Category>> { usage[it.value.id] ?: 0 }.thenBy { it.index }).map { it.value }
+        val top = ranked.take(QUICK_COUNT - 1).toMutableList()
+        val chosen = categories.firstOrNull { it.id == selected }
+        if (chosen != null && chosen !in top) top[top.lastIndex] = chosen
+        top
+    }
+    val tiles: List<Category?> = if (needsMore) shown + null else shown
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        tiles.chunked(4).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                row.forEach { c ->
+                    if (c == null) MoreTile(Modifier.weight(1f), onMore)
+                    else CategoryTile(c, c.id == selected, Modifier.weight(1f)) { onSelect(c.id) }
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
             }
+        }
+    }
+}
+
+@Composable
+private fun CategoryTile(c: Category, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val tint = Color(c.color)
+    Column(
+        modifier
+            .background(if (isSelected) tint.copy(alpha = 0.14f) else Color.Transparent, RoundedCornerShape(12.dp))
+            .border(if (isSelected) 1.5.dp else 0.dp, if (isSelected) tint else Color.Transparent, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        IconBadge(CategoryIcons.of(c.icon), tint, size = 36.dp)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            c.name, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center, minLines = 2,
+            overflow = TextOverflow.Ellipsis, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
+private fun MoreTile(modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        IconBadge(Icons.Filled.Apps, MaterialTheme.colorScheme.primary, size = 36.dp)
+        Spacer(Modifier.height(4.dp))
+        Text(stringResource(R.string.more_categories), style = MaterialTheme.typography.labelSmall, maxLines = 2, minLines = 2, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** Every category, with search, in a sheet that opens over the form. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategorySheet(categories: List<Category>, selected: Long?, onSelect: (Long) -> Unit, onManage: () -> Unit, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    var query by rememberSaveable { mutableStateOf("") }
+    val shown = categories.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+    fun close(after: () -> Unit = {}) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss(); after() }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.choose_category), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = { close(onManage) }) {
+                Icon(Icons.Filled.Edit, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.manage))
+            }
+        }
+        if (categories.size > QUICK_COUNT) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it.take(40) },
+                leadingIcon = { Icon(Icons.Filled.Search, null) },
+                placeholder = { Text(stringResource(R.string.search_categories)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items(shown, key = { it.id }) { c ->
+                CategoryTile(c, c.id == selected) { onSelect(c.id); close() }
+            }
+        }
+        if (shown.isEmpty()) {
+            Text(
+                stringResource(R.string.no_matching_categories), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+            )
         }
     }
 }

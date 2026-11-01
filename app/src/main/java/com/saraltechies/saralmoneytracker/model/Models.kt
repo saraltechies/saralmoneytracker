@@ -4,7 +4,8 @@ import java.time.LocalDate
 
 enum class TxnType { EXPENSE, INCOME, TRANSFER }
 
-enum class AccountType { CASH, BANK, CARD, WALLET, OTHER }
+/** [LOAN] accounts belong to a [Loan]: they're kept out of the account lists and shown on the Loans screen instead. */
+enum class AccountType { CASH, BANK, CARD, WALLET, OTHER, LOAN }
 
 enum class Frequency { DAILY, WEEKLY, MONTHLY, YEARLY }
 
@@ -49,6 +50,8 @@ data class Txn(
     val note: String = "",
     val recurringId: Long? = null,
     val createdAt: Long = 0,
+    /** Set on entries that belong to a [Loan]: money given, paid back, or interest. */
+    val loanId: Long? = null,
 )
 
 /** A repeating entry (salary, rent, EMI, SIP, subscriptions). Due copies are added automatically. */

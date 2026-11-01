@@ -6,6 +6,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -100,7 +101,16 @@ class StoreScreenshotsTest {
 
     private fun click(text: String, substring: Boolean = false) {
         val matcher = hasText(text, substring = substring) and hasClickAction()
-        compose.waitUntil(8_000) { compose.onAllNodes(matcher, useUnmergedTree = false).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            compose.waitUntil(8_000) { compose.onAllNodes(matcher, useUnmergedTree = false).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: Throwable) {
+            // Leave the screen and its semantics tree next to the screenshots, to see what was there instead.
+            shot("failed-" + text.filter { it.isLetterOrDigit() })
+            val roots = runCatching { compose.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().size.toString() }.getOrElse { it.toString() }
+            val dump = runCatching { compose.onAllNodes(androidx.compose.ui.test.isRoot()).onFirst().printToString(maxDepth = 30) }.getOrElse { it.toString() }
+            File(dir, "failed-tree.txt").writeText("Looking for: $text\nRoots: $roots\n\n$dump")
+            throw e
+        }
         compose.onAllNodes(matcher).onFirst().performClick()
         settle()
     }

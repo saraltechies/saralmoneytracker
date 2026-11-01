@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +43,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -48,6 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.LoanItem
+import com.saraltechies.saralmoneytracker.data.PersonLoans
+import com.saraltechies.saralmoneytracker.model.PledgeTotals
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
@@ -69,6 +77,7 @@ fun LoansScreen(
     onBack: () -> Unit,
     onOpen: (Long) -> Unit,
     onAdd: (LoanDirection) -> Unit,
+    onOpenPerson: (String) -> Unit = {},
 ) {
     val items by remember { repository.watch { repository.loanItems() } }.collectAsStateWithLifecycle(null)
     var filter by rememberSaveable { mutableStateOf<LoanDirection?>(null) }
@@ -95,6 +104,11 @@ fun LoansScreen(
         val shown = all.filter { filter == null || it.loan.direction == filter }
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 88.dp)) {
             item { LoanTotalsCard(toReceive, toPay, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+            val held = PledgeTotals.held(all.filter { it.loan.direction == LoanDirection.LENT }.map { it.loan })
+            val pledged = PledgeTotals.held(all.filter { it.loan.direction == LoanDirection.BORROWED }.map { it.loan })
+            if (!held.isEmpty || !pledged.isEmpty) {
+                item { PledgeTotalsLine(held, pledged, Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp)) }
+            }
             if (all.isEmpty()) {
                 item {
                     EmptyState(
@@ -117,14 +131,23 @@ fun LoansScreen(
                     FilterChip(selected = filter == LoanDirection.BORROWED, onClick = { filter = LoanDirection.BORROWED }, label = { Text(stringResource(R.string.loans_borrowed)) })
                 }
             }
-            val active = shown.filter { !it.loan.closed }
-            val closed = shown.filter { it.loan.closed }
-            items(active.sortedWith(compareBy({ it.summary.nextDueDate ?: LocalDate.MAX }, { -it.summary.outstanding })), key = { it.loan.id }) {
-                LoanRow(it, onClick = { onOpen(it.loan.id) })
+            // Someone with several loans (each girvi at its own rate, say) is one row that opens their whole account.
+            val people = PersonLoans.group(shown)
+            val (active, closed) = people.partition { p -> p.loans.any { !it.loan.closed } }
+            val byDue = compareBy<PersonLoans>(
+                { p -> p.loans.filter { !it.loan.closed }.mapNotNull { it.summary.nextDueDate }.minOrNull() ?: LocalDate.MAX },
+                { p -> -(p.toReceive + p.toPay) },
+            )
+            items(active.sortedWith(byDue), key = { it.key }) { p ->
+                if (p.loans.size == 1) LoanRow(p.loans.first(), onClick = { onOpen(p.loans.first().loan.id) })
+                else PersonRow(p, onClick = { onOpenPerson(p.key) })
             }
             if (closed.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.loans_closed)) }
-                items(closed, key = { it.loan.id }) { LoanRow(it, onClick = { onOpen(it.loan.id) }, dim = true) }
+                items(closed, key = { it.key }) { p ->
+                    if (p.loans.size == 1) LoanRow(p.loans.first(), onClick = { onOpen(p.loans.first().loan.id) }, dim = true)
+                    else PersonRow(p, onClick = { onOpenPerson(p.key) }, dim = true)
+                }
             }
         }
     }
@@ -186,13 +209,66 @@ fun LoanRow(item: LoanItem, onClick: () -> Unit, dim: Boolean = false) {
     }
 }
 
-/** One line about a loan: "Lent · 2% a month · Next ₹500 on 5 Dec", "Overdue ₹1,000", "Settled". */
+/** Someone with several loans: what they owe (or you owe them) in all, how many loans, and the items held. */
 @Composable
-fun loanStatus(item: LoanItem): String {
+fun PersonRow(person: PersonLoans, onClick: () -> Unit, dim: Boolean = false) {
+    val context = LocalContext.current
+    val net = person.toReceive - person.toPay
+    val color = when {
+        dim -> MaterialTheme.colorScheme.outline
+        net >= 0 -> AppTheme.money.income
+        else -> AppTheme.money.expense
+    }
+    val held = person.heldByYou.takeIf { !it.isEmpty } ?: person.pledgedByYou
+    val status = listOfNotNull(
+        pluralStringResource(R.plurals.person_loans_count, person.loans.size, person.loans.size),
+        person.openCount.takeIf { it > 0 && it < person.loans.size }?.let { stringResource(R.string.person_open_count, it) },
+        held.takeIf { !it.isEmpty }?.let { Pledges.totals(context, it) },
+    ).joinToString(" · ")
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconBadge(Icons.Filled.Groups, color)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(person.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                Text(money(kotlin.math.abs(net)), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = if (dim) MaterialTheme.colorScheme.onSurfaceVariant else color)
+            }
+            Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** "Kept with you: Gold 45.5 g · Pledged by you: Silver 200 g". */
+@Composable
+fun PledgeTotalsLine(held: PledgeTotals, pledged: PledgeTotals, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.Diamond, null, Modifier.size(16.dp), tint = pledgeColor(com.saraltechies.saralmoneytracker.model.PledgeKind.GOLD))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            listOfNotNull(
+                held.takeIf { !it.isEmpty }?.let { stringResource(R.string.pledge_held_lent) + ": " + Pledges.totals(context, it) },
+                pledged.takeIf { !it.isEmpty }?.let { stringResource(R.string.pledge_held_borrowed) + ": " + Pledges.totals(context, it) },
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** One line about a loan: "Lent · 2% a month · Gold 10 g · Next ₹500 on 5 Dec", "Overdue ₹1,000", "Settled". */
+@Composable
+fun loanStatus(item: LoanItem, withDirection: Boolean = true): String {
     val s = item.summary
     val loan = item.loan
-    val parts = mutableListOf(stringResource(if (loan.direction == LoanDirection.LENT) R.string.loans_lent else R.string.loans_borrowed))
+    val parts = mutableListOf<String>()
+    if (withDirection) parts += stringResource(if (loan.direction == LoanDirection.LENT) R.string.loans_lent else R.string.loans_borrowed)
     parts += if (loan.rate > 0) rateText(loan.rate, loan.rateUnit) else stringResource(R.string.loan_no_interest)
+    loan.pledge?.takeIf { !it.returned }?.let { parts += Pledges.summary(LocalContext.current, it, withItems = false) }
     when {
         loan.closed -> parts += stringResource(R.string.loan_closed)
         s.settled -> parts += stringResource(R.string.loan_settled)

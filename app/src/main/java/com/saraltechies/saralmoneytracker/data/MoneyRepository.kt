@@ -25,6 +25,8 @@ import com.saraltechies.saralmoneytracker.model.LoanEventKind
 import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanSummary
 import com.saraltechies.saralmoneytracker.model.LoanEvent
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.model.PledgeTotals
 import com.saraltechies.saralmoneytracker.model.BookReport
 import com.saraltechies.saralmoneytracker.model.CashForecast
 import com.saraltechies.saralmoneytracker.model.Forecasts
@@ -87,7 +89,37 @@ data class LoanItem(
     val txns: List<Txn>,
     /** Who the loan is with, and their details; null only for a loan whose contact was lost. */
     val contact: Contact? = null,
-)
+) {
+    /** The person's name, without the "(2)" a second loan's account gets. */
+    val personName: String get() = contact?.name?.takeIf { it.isNotBlank() } ?: name
+}
+
+/**
+ * Everything with one person: each loan keeps its own date, rate and pledge, and the account adds them up.
+ * Loans given and loans taken are counted apart, so "to receive" and "to pay" never cancel out by mistake.
+ */
+data class PersonLoans(val key: String, val name: String, val contact: Contact?, val loans: List<LoanItem>) {
+    private fun open(direction: LoanDirection) = loans.filter { !it.loan.closed && it.loan.direction == direction }
+    val toReceive: Long get() = open(LoanDirection.LENT).sumOf { it.summary.outstanding }
+    val toPay: Long get() = open(LoanDirection.BORROWED).sumOf { it.summary.outstanding }
+    val openCount: Int get() = loans.count { !it.loan.closed }
+    val principalLeft: Long get() = loans.filter { !it.loan.closed }.sumOf { it.summary.principalLeft.coerceAtLeast(0) }
+    val interestDue: Long get() = loans.filter { !it.loan.closed }.sumOf { it.summary.interestDue }
+    val monthlyInterest: Long get() = loans.filter { !it.loan.closed }.sumOf { it.summary.monthlyInterest }
+    /** Pledges you hold for this person's loans (given) and that you've pledged with them (taken). */
+    val heldByYou: PledgeTotals get() = PledgeTotals.held(loans.filter { it.loan.direction == LoanDirection.LENT }.map { it.loan })
+    val pledgedByYou: PledgeTotals get() = PledgeTotals.held(loans.filter { it.loan.direction == LoanDirection.BORROWED }.map { it.loan })
+    val lastDate: LocalDate get() = loans.maxOf { l -> l.events.maxOfOrNull { it.date } ?: l.loan.startDate }
+
+    companion object {
+        /** The account key for a loan: its contact, or the loan itself when the contact was lost. */
+        fun keyOf(item: LoanItem): String = item.loan.contactId?.let { "c$it" } ?: "l${item.loan.id}"
+
+        /** Loans grouped by person, in the order they first appear in [items]. */
+        fun group(items: List<LoanItem>): List<PersonLoans> =
+            items.groupBy(::keyOf).map { (key, list) -> PersonLoans(key, list.first().personName, list.firstNotNullOfOrNull { it.contact }, list) }
+    }
+}
 
 /** The terms filled in on the loan form. */
 data class LoanTerms(
@@ -101,6 +133,8 @@ data class LoanTerms(
     val installment: Long,
     val note: String,
     val bookId: Long = Books.PERSONAL_ID,
+    /** Gold, silver or other items kept as security; null for none. */
+    val pledge: Pledge? = null,
 )
 
 data class ImportReport(val added: Int, val duplicates: Int, val transfers: Int, val categoriesAdded: Int, val accountsAdded: Int, val budgetsSet: Int, val recurringAdded: Int)
@@ -355,6 +389,10 @@ class MoneyRepository(private val context: Context) {
             LoanItem(loan, account?.name.orEmpty(), events, LoanMath.summary(loan, events, asOf), byLoan[loan.id].orEmpty(), loan.contactId?.let { contacts[it] })
         }
     }
+
+    /** Everything with one person ([PersonLoans.keyOf]), or null when they have no loans left. */
+    fun personLoans(key: String, asOf: LocalDate = LocalDate.now()): PersonLoans? =
+        PersonLoans.group(loanItems(asOf, book = Books.ALL).filter { PersonLoans.keyOf(it) == key }).firstOrNull()
 
     fun loanItem(id: Long, asOf: LocalDate = LocalDate.now()): LoanItem? = loanItems(asOf, book = Books.ALL).firstOrNull { it.loan.id == id }
 
@@ -728,6 +766,12 @@ class MoneyRepository(private val context: Context) {
         w.execSQL("UPDATE $T_LOANS SET closed = ? WHERE id = ?", arrayOf<Any?>(if (closed) 1 else 0, id))
     }
 
+    /** Marks a loan's pledged items as given back on [on], or as still held when [on] is null; [close] also closes the loan. */
+    suspend fun setPledgeReturned(id: Long, on: LocalDate?, close: Boolean = false) = write { w ->
+        w.execSQL("UPDATE $T_LOANS SET pledge_returned_day = ? WHERE id = ? AND pledge_kind IS NOT NULL", arrayOf<Any?>(on?.toEpochDay(), id))
+        if (close) w.execSQL("UPDATE $T_LOANS SET closed = 1 WHERE id = ?", arrayOf<Any?>(id))
+    }
+
     /** Deletes a loan with its whole history; your account balances go back to how they'd be without it. */
     suspend fun deleteLoan(loan: Loan) = write { w ->
         w.delete(T_TXNS, "loan_id = ?", arrayOf(loan.id.toString()))
@@ -739,6 +783,7 @@ class MoneyRepository(private val context: Context) {
     private fun loanFrom(terms: LoanTerms, accountId: Long) = Loan(
         accountId = accountId, direction = terms.direction, startDate = terms.startDate, rate = terms.rate.coerceAtLeast(0), rateUnit = terms.rateUnit, bookId = terms.bookId,
         plan = terms.plan, installments = terms.installments.coerceAtLeast(0), installment = terms.installment.coerceAtLeast(0), note = terms.note.trim(),
+        pledge = terms.pledge?.let { it.copy(items = it.items.trim(), purity = it.purity.trim(), weightMg = it.weightMg.coerceAtLeast(0), value = it.value.coerceAtLeast(0)) },
     )
 
     /**
@@ -867,7 +912,7 @@ class MoneyRepository(private val context: Context) {
                 MoneyDb.values(
                     Loan(
                         accountId = accountId, direction = l.direction, startDate = l.startDate, rate = l.rate, rateUnit = l.rateUnit, plan = l.plan,
-                        installments = l.installments, installment = l.installment, note = l.note, closed = l.closed, bookId = bookOf(l.book),
+                        installments = l.installments, installment = l.installment, note = l.note, closed = l.closed, bookId = bookOf(l.book), pledge = l.pledge,
                         contactId = (l.contact ?: l.name).let { contactIds[key(it)] } ?: w.insert(T_CONTACTS, null, MoneyDb.values(Contact(name = l.name))),
                     ),
                 ),

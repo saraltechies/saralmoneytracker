@@ -22,6 +22,8 @@ import com.saraltechies.saralmoneytracker.model.LoanEventKind
 import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.PartyRole
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Txn
@@ -75,6 +77,14 @@ class StoreScreenshotsTest {
             click(s(R.string.loans_title))
             click("PNB term loan")
             shot("5-loan-emi")
+            back()
+            settle()
+            // Gold and silver pledged three times by one person, each at its own rate.
+            click("Sunita Devi")
+            shot("8-girvi-account")
+            click("1 chain", substring = true)
+            shot("9-girvi-loan")
+            back()
             back()
             back()
             settle()
@@ -232,6 +242,29 @@ class StoreScreenshotsTest {
         val loan = repo.loanItem(loanId)!!.loan
         LoanMath.schedule(rupees(3_00_000), LoanMath.monthlyRate(1150, RateUnit.YEAR), 36, emi, start).take(7).filter { !it.date.isAfter(today) }.forEach { row ->
             repo.addLoanEntries(loan, listOf(LoanEventKind.INTEREST to row.interest, LoanEventKind.REPAID to row.principal), row.date, bank.id, "EMI ${row.number}")
+        }
+
+        // Girvi: one person pledges gold, then more gold, then silver, each as its own loan at its own rate.
+        // Given before these books start (no account), so the shop's balances in the other screenshots stay as they are.
+        var sunita = Contact(name = "Sunita Devi", phone = "98765 43210", address = "Ram Ganga Vihar, Moradabad")
+        val girvi = listOf(
+            Triple(8L, 1200L, Pledge(PledgeKind.GOLD, items = "1 chain", weightMg = 10_250, purity = "22K", value = rupees(70_000))) to rupees(50_000),
+            Triple(4L, 1800L, Pledge(PledgeKind.GOLD, items = "2 bangles", weightMg = 15_000, purity = "22K", value = rupees(1_00_000))) to rupees(60_000),
+            Triple(2L, 1000L, Pledge(PledgeKind.SILVER, items = "Pair of anklets", weightMg = 200_000, purity = "92.5", value = rupees(18_000))) to rupees(12_000),
+        )
+        for ((terms, amount) in girvi) {
+            val (monthsAgo, rate, pledge) = terms
+            val id = repo.createLoan(
+                LoanTerms(
+                    name = sunita.name, direction = LoanDirection.LENT, startDate = today.minusMonths(monthsAgo), rate = rate, rateUnit = RateUnit.YEAR,
+                    plan = LoanPlan.FLEXIBLE, installments = 0, installment = 0, note = "", bookId = shop, pledge = pledge,
+                ),
+                amount, null, sunita,
+            )
+            val item = repo.loanItem(id)!!
+            sunita = item.contact!!
+            // The first loan's interest was paid for a few months.
+            if (monthsAgo == 8L) repo.addLoanEntries(item.loan, listOf(LoanEventKind.INTEREST to rupees(2_500)), today.minusMonths(3), bank.id, "Interest, 5 months")
         }
         repo.processRecurring()
     }

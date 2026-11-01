@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -94,6 +95,8 @@ import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.TxnType
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
 import com.saraltechies.saralmoneytracker.ui.components.ChoiceDialog
 import com.saraltechies.saralmoneytracker.ui.components.ConfirmDialog
@@ -134,6 +137,8 @@ fun LoanDetailScreen(
     var entry by remember { mutableStateOf<EntryMode?>(null) }
     var showPlan by rememberSaveable { mutableStateOf(false) }
     var statement by rememberSaveable { mutableStateOf(false) }
+    // Picking the day pledged items were given back: false to only mark them, true to also close the loan.
+    var returnPick by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val snackbar = remember { SnackbarHostState() }
     // Your details for the loan's book: a business loan's statement shows the business.
     val me by remember { repository.watch { repository.loanItem(loanId)?.let { repository.myDetails(it.loan.bookId) } } }.collectAsStateWithLifecycle(null)
@@ -157,6 +162,15 @@ fun LoanDetailScreen(
                             text = { Text(stringResource(if (closed) R.string.loan_reopen else R.string.loan_close)) },
                             onClick = { menu = false; scope.launch { repository.setLoanClosed(loanId, !closed) } },
                         )
+                        item?.loan?.pledge?.let { p ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(if (p.returned) R.string.pledge_mark_held else R.string.pledge_mark_returned)) },
+                                onClick = {
+                                    menu = false
+                                    if (p.returned) scope.launch { repository.setPledgeReturned(loanId, null) } else returnPick = false
+                                },
+                            )
+                        }
                         DropdownMenuItem(text = { Text(stringResource(R.string.delete)) }, onClick = { menu = false; confirmDelete = true })
                     }
                 },
@@ -207,7 +221,10 @@ fun LoanDetailScreen(
                     }
                 }
             }
+            loan.pledge?.let { p -> item { PledgeCard(p, lent) } }
             if (s.settled && !loan.closed && s.given > 0) {
+                // Items still held go back when the loan is paid off, so that's offered together with closing it.
+                val itemsHeld = loan.pledge?.returned == false
                 item {
                     Card(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth(),
@@ -216,8 +233,18 @@ fun LoanDetailScreen(
                         Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Filled.CheckCircle, null, tint = AppTheme.money.income)
                             Spacer(Modifier.width(12.dp))
-                            Text(stringResource(R.string.loan_settled_text), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            TextButton(onClick = { scope.launch { repository.setLoanClosed(loanId, true) } }) { Text(stringResource(R.string.loan_close)) }
+                            Text(
+                                stringResource(
+                                    when {
+                                        !itemsHeld -> R.string.loan_settled_text
+                                        lent -> R.string.pledge_settled_text_lent
+                                        else -> R.string.pledge_settled_text_borrowed
+                                    },
+                                ),
+                                Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                            )
+                            if (itemsHeld) TextButton(onClick = { returnPick = true }) { Text(stringResource(R.string.pledge_return_close)) }
+                            else TextButton(onClick = { scope.launch { repository.setLoanClosed(loanId, true) } }) { Text(stringResource(R.string.loan_close)) }
                         }
                     }
                 }
@@ -295,6 +322,14 @@ fun LoanDetailScreen(
                 EventRow(e, lent, accountId?.let { accountNames[it] }, onClick = { entry = EntryMode.Edit(e) })
             }
         }
+    }
+
+    returnPick?.let { close ->
+        DatePickDialog(
+            LocalDate.now(),
+            onDismiss = { returnPick = null },
+            onPick = { day -> scope.launch { repository.setPledgeReturned(loanId, day, close = close) } },
+        )
     }
 
     val current = item
@@ -572,6 +607,41 @@ private fun EntryDialog(
             onDismiss = { confirmDelete = false },
         )
     }
+}
+
+/** The gold, silver or other items kept as security, and whether they've been given back. */
+@Composable
+private fun PledgeCard(p: Pledge, lent: Boolean) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(Icons.Filled.Diamond, if (p.returned) MaterialTheme.colorScheme.outline else pledgeColor(p.kind), size = 36.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(if (lent) R.string.pledge_title_lent else R.string.pledge_title_borrowed), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(Pledges.summary(context, p, withItems = false), style = MaterialTheme.typography.titleSmall)
+                if (p.items.isNotBlank()) Text(p.items, style = MaterialTheme.typography.bodyMedium)
+                val extra = listOfNotNull(
+                    p.value.takeIf { it > 0 }?.let { stringResource(R.string.pledge_value) + " " + money(it) },
+                    Pledges.status(context, p, lent),
+                ).joinToString(" · ")
+                Text(
+                    extra, style = MaterialTheme.typography.bodySmall,
+                    color = if (p.returned) AppTheme.money.income else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** Gold looks like gold, silver like silver. */
+fun pledgeColor(kind: PledgeKind): androidx.compose.ui.graphics.Color = when (kind) {
+    PledgeKind.GOLD -> androidx.compose.ui.graphics.Color(0xFFD4A017)
+    PledgeKind.SILVER -> androidx.compose.ui.graphics.Color(0xFF8A9BA8)
+    PledgeKind.OTHER -> androidx.compose.ui.graphics.Color(0xFF7C3AED)
 }
 
 /** Who the loan is with: tap the phone to call, the email to write. */

@@ -12,6 +12,8 @@ import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Loan
 import com.saraltechies.saralmoneytracker.model.Party
 import com.saraltechies.saralmoneytracker.model.PartyRole
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.RateUnit
@@ -130,16 +132,24 @@ object BackupFormat {
         )
         w.sheet(
             SHEET_LOANS,
-            listOf(listOf("Name", "Direction", "Start date", "Interest %", "Rate per", "Plan", "Instalments", "Instalment amount", "Note", "Closed", "Contact", "Book")) +
+            listOf(
+                listOf(
+                    "Name", "Direction", "Start date", "Interest %", "Rate per", "Plan", "Instalments", "Instalment amount", "Note", "Closed", "Contact", "Book",
+                    "Pledge", "Pledged items", "Weight g", "Purity", "Pledge value", "Returned on",
+                ),
+            ) +
                 data.loans.map { l ->
+                    val p = l.pledge
                     listOf(
                         loanAccounts[l.id].orEmpty(), directionName(l.direction), l.startDate,
                         java.math.BigDecimal.valueOf(l.rate, 2).stripTrailingZeros().toPlainString(), rateUnitName(l.rateUnit), planName(l.plan),
                         if (l.plan == LoanPlan.MONTHLY) l.installments.toString() else "", if (l.plan == LoanPlan.MONTHLY) MoneyCell(l.installment) else null,
                         l.note, if (l.closed) "Yes" else "", l.contactId?.let { contactNames[it] }.orEmpty(), bookOf(l.bookId),
+                        p?.let { pledgeKindName(it.kind) }.orEmpty(), p?.items.orEmpty(), p?.weightMg?.takeIf { it > 0 }?.let(Pledge::grams).orEmpty(),
+                        p?.purity.orEmpty(), p?.value?.takeIf { it > 0 }?.let(::MoneyCell), p?.returnedOn,
                     )
                 },
-            widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8, 22, 16),
+            widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8, 22, 16, 10, 28, 10, 10, 14, 14),
         )
         if (data.parties.isNotEmpty()) {
             w.sheet(
@@ -248,6 +258,17 @@ object BackupFormat {
     }
 
     fun parsePlan(text: String): LoanPlan = if (text.trim().equals("monthly", true)) LoanPlan.MONTHLY else LoanPlan.FLEXIBLE
+
+    fun pledgeKindName(k: PledgeKind) = when (k) {
+        PledgeKind.GOLD -> "Gold"
+        PledgeKind.SILVER -> "Silver"
+        PledgeKind.OTHER -> "Other"
+    }
+
+    /** "Gold", "Silver" or "Other"; null for an empty cell (no pledge). */
+    fun parsePledgeKind(text: String): PledgeKind? = text.trim().takeIf { it.isNotEmpty() }?.let { t ->
+        PledgeKind.entries.firstOrNull { pledgeKindName(it).equals(t, true) } ?: PledgeKind.OTHER
+    }
 
     fun contactKindName(k: ContactKind) = when (k) {
         ContactKind.PERSON -> "Person"

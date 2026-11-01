@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.4.0. Re-check before each release.
+Every claim below matches the code as of 1.5.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -70,6 +70,7 @@ PRIVATE AND SECURE
 • No internet permission: your data can't leave your phone
 • No ads, no sign-up, no tracking
 • App lock with your fingerprint, face or phone PIN
+• Automatic daily or weekly backup to a folder you choose, like Google Drive
 
 ALSO
 • 29 currencies, with Indian number format for rupees (₹1,25,000)

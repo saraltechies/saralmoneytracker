@@ -8,7 +8,7 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=com.saraltechies.saralmoneytracker)
 -->
 
-## Features (1.4)
+## Features (1.5)
 
 - **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), your most used categories first (with **More**
   and a search for the rest), today/yesterday chips, and
@@ -52,6 +52,9 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   columns, or a bank statement with Debit/Credit columns. Copied rows are skipped, "Credit Card" bill payments can be turned
   into transfers, and a summary sheet's planned amounts can become budgets. Importing the same file twice is safe.
 - **Excel export** that doubles as a full backup (accounts, categories with budgets, repeating entries, loans, every entry), and CSV.
+- **Automatic backup**, daily or weekly, into a folder you pick (on the phone or a Google Drive folder), keeping the newest 7.
+  No internet or storage permission: Android's folder picker grants access to that one folder.
+- **First-run setup** (personal, business or both) and a **What's new** sheet for people updating.
 - **App lock** with the phone's fingerprint, face or screen lock; optional **hide in recent apps** (blocks screenshots).
 - **Daily reminder** in the evening on days nothing was added, and on the day a loan payment is due.
 - 29 currencies, Indian number grouping for rupees (₹1,25,000), editable categories with 49 icons and 20 colours,

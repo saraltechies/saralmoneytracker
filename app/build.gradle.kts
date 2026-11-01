@@ -20,8 +20,8 @@ android {
         applicationId = "com.saraltechies.saralmoneytracker"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     signingConfigs {
@@ -66,6 +66,8 @@ dependencies {
     // BiometricPrompt (app lock) needs a FragmentActivity, and Play's in-app update library brings an old Fragment.
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.biometric)
+    // QR codes for "scan to pay" on loan statements. Pure Java, no network.
+    implementation(libs.zxing.core)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

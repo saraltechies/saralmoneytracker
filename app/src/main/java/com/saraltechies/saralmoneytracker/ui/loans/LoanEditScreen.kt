@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -58,7 +59,10 @@ import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.RateUnit
+import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
+import com.saraltechies.saralmoneytracker.ui.contacts.ContactFields
+import com.saraltechies.saralmoneytracker.ui.contacts.ContactSaver
 import com.saraltechies.saralmoneytracker.ui.components.ChoiceDialog
 import com.saraltechies.saralmoneytracker.ui.components.DatePickDialog
 import com.saraltechies.saralmoneytracker.ui.components.Dates
@@ -86,7 +90,9 @@ fun LoanEditScreen(
     var existing by remember { mutableStateOf<LoanItem?>(null) }
     var loaded by rememberSaveable { mutableStateOf(loanId == 0L) }
     var direction by rememberSaveable { mutableStateOf(initialDirection) }
-    var name by rememberSaveable { mutableStateOf("") }
+    var contact by rememberSaveable(stateSaver = ContactSaver) { mutableStateOf(Contact(name = "")) }
+    var pickSaved by remember { mutableStateOf(false) }
+    val savedContacts by remember { repository.watch { repository.contacts() } }.collectAsStateWithLifecycle(emptyList())
     var amountText by rememberSaveable { mutableStateOf("") }
     var dateDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
     // -1 = not from my accounts (a loan from before), 0 = not chosen yet.
@@ -112,7 +118,7 @@ fun LoanEditScreen(
         if (loaded) return@LaunchedEffect
         val l = item.loan
         direction = l.direction
-        name = item.name
+        contact = item.contact ?: Contact(name = item.name)
         dateDay = l.startDate.toEpochDay()
         withInterest = l.rate > 0
         rateText = if (l.rate > 0) ratePlain(l.rate) else ""
@@ -137,7 +143,9 @@ fun LoanEditScreen(
 
     fun save() {
         error = when {
-            name.isBlank() -> R.string.error_loan_name
+            contact.name.isBlank() -> R.string.error_loan_name
+            contact.email.isNotBlank() && !Contact.isEmail(contact.email) -> R.string.error_email
+            contact.upi.isNotBlank() && !Contact.isUpiId(contact.upi) -> R.string.error_upi
             principal == null || principal <= 0 -> R.string.error_amount
             withInterest && (rate <= 0 || rate > 10_000) -> R.string.error_rate
             monthly && (months !in 1..600) -> R.string.error_months
@@ -147,18 +155,18 @@ fun LoanEditScreen(
         }
         if (error != null || principal == null) return
         val terms = LoanTerms(
-            name = name, direction = direction, startDate = date, rate = rate, rateUnit = rateUnit,
+            name = contact.name.trim(), direction = direction, startDate = date, rate = rate, rateUnit = rateUnit,
             plan = if (monthly) LoanPlan.MONTHLY else LoanPlan.FLEXIBLE,
             installments = if (monthly) months else 0, installment = if (monthly) installment else 0, note = note,
         )
         scope.launch {
             val item = existing
             if (item == null) {
-                val id = repository.createLoan(terms, principal, accountId.takeIf { it > 0 })
+                val id = repository.createLoan(terms, principal, accountId.takeIf { it > 0 }, contact)
                 settings.recordGoodMoment()
                 onSaved(id)
             } else {
-                repository.updateLoan(item.loan, terms)
+                repository.updateLoan(item.loan, terms, contact)
                 onBack()
             }
         }
@@ -191,9 +199,12 @@ fun LoanEditScreen(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it.take(40); error = null },
+                    value = contact.name, onValueChange = { contact = contact.copy(name = it.take(60)); error = null },
                     label = { Text(stringResource(if (lent) R.string.loan_given_to else R.string.loan_taken_from)) },
                     leadingIcon = { Icon(Icons.Filled.Person, null) },
+                    trailingIcon = if (savedContacts.isNotEmpty()) ({
+                        IconButton(onClick = { pickSaved = true }) { Icon(Icons.Filled.Contacts, stringResource(R.string.contact_choose_saved)) }
+                    }) else null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -289,6 +300,13 @@ fun LoanEditScreen(
 
                 if (principal != null && principal > 0) PlanPreview(principal, rate, rateUnit, monthly, months, installment, date, lent)
 
+                SectionLabel(stringResource(R.string.contact_details))
+                Text(
+                    stringResource(R.string.contact_details_hint), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp),
+                )
+                ContactFields(contact = contact, onChange = { contact = it; error = null }, showName = false)
+
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it.take(200) },
@@ -313,6 +331,16 @@ fun LoanEditScreen(
         }
     }
 
+    if (pickSaved) {
+        ChoiceDialog(
+            title = stringResource(R.string.contact_choose_saved),
+            options = savedContacts,
+            selected = savedContacts.firstOrNull { it.id == contact.id },
+            label = { c -> listOf(c.name, c.phone).filter { it.isNotBlank() }.joinToString(" · ") },
+            onPick = { contact = it; error = null },
+            onDismiss = { pickSaved = false },
+        )
+    }
     if (pickDate) DatePickDialog(date, onDismiss = { pickDate = false }, onPick = { dateDay = it.toEpochDay() })
     if (pickAccount) {
         val none = Account(id = -1, name = stringResource(R.string.loan_not_from_accounts), type = com.saraltechies.saralmoneytracker.model.AccountType.OTHER)

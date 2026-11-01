@@ -1,6 +1,7 @@
 package com.saraltechies.saralmoneytracker.xlsx
 
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
@@ -37,6 +38,8 @@ data class ImportedLoan(
     val installment: Long,
     val note: String,
     val closed: Boolean,
+    /** The contact's name in the Contacts sheet. */
+    val contact: String? = null,
 )
 
 data class ImportedAccount(val name: String, val type: AccountType, val opening: Long, val archived: Boolean = false)
@@ -76,8 +79,10 @@ data class ImportResult(
     /** True when the file is a Saral Money Tracker export (a full backup). */
     val isBackup: Boolean,
     val loans: List<ImportedLoan> = emptyList(),
+    /** People, banks and vendors with their details, and your own (kind SELF); ids are not set. */
+    val contacts: List<Contact> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = rows.isEmpty() && accounts.isEmpty() && categories.isEmpty() && recurring.isEmpty() && loans.isEmpty()
+    val isEmpty: Boolean get() = rows.isEmpty() && accounts.isEmpty() && categories.isEmpty() && recurring.isEmpty() && loans.isEmpty() && contacts.isEmpty()
 }
 
 /**
@@ -181,11 +186,24 @@ object SpreadsheetImport {
                     installment = amount(s.cell(r, h["instalment amount"] ?: -1))?.absoluteValue ?: 0,
                     note = text(s, r, h["note"]),
                     closed = text(s, r, h["closed"]).equals("yes", true),
+                    contact = text(s, r, h["contact"]).ifEmpty { null },
                 )
             }
         }.orEmpty()
         val (unique, duplicates) = dedupe(rows)
-        return ImportResult(unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true, loans = loans)
+        val contacts = sheet(BackupFormat.SHEET_CONTACTS)?.let { s ->
+            val h = headerIndex(s, 0)
+            (1..s.lastRow).mapNotNull { r ->
+                val name = text(s, r, h["name"]).ifEmpty { return@mapNotNull null }
+                Contact(
+                    name = name, kind = BackupFormat.parseContactKind(text(s, r, h["type"])), phone = text(s, r, h["phone"]),
+                    email = text(s, r, h["email"]), address = text(s, r, h["address"]), taxId = text(s, r, h["pan / gstin"]),
+                    bankName = text(s, r, h["bank"]), bankAccount = text(s, r, h["account number"]), ifsc = text(s, r, h["ifsc"]),
+                    upi = text(s, r, h["upi id"]), reference = text(s, r, h["reference"]), note = text(s, r, h["note"]),
+                )
+            }
+        }.orEmpty()
+        return ImportResult(unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true, loans = loans, contacts = contacts)
     }
 
     // ---- Hand-made trackers and statements ----------------------------------------------------------------

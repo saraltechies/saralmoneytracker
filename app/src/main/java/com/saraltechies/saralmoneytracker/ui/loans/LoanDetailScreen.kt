@@ -31,7 +31,14 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Percent
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -111,6 +118,7 @@ fun LoanDetailScreen(
     loanId: Long,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onMyDetails: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -120,6 +128,8 @@ fun LoanDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var entry by remember { mutableStateOf<EntryMode?>(null) }
     var showPlan by rememberSaveable { mutableStateOf(false) }
+    var statement by rememberSaveable { mutableStateOf(false) }
+    val me by remember { repository.watch { repository.myDetails() } }.collectAsStateWithLifecycle(null)
     val currency = LocalCurrency.current
 
     Scaffold(
@@ -128,11 +138,8 @@ fun LoanDetailScreen(
                 title = { Text(item?.name.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
                 actions = {
-                    item?.let { current ->
-                        IconButton(onClick = {
-                            val text = LoanStatement.text(context, current, currency)
-                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
-                        }) { Icon(Icons.Filled.Share, stringResource(R.string.loan_share)) }
+                    if (item != null) {
+                        IconButton(onClick = { statement = true }) { Icon(Icons.Filled.PictureAsPdf, stringResource(R.string.loan_statement)) }
                     }
                     IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, stringResource(R.string.edit)) }
                     IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.more)) }
@@ -221,6 +228,9 @@ fun LoanDetailScreen(
                     }
                 }
             }
+            current.contact?.takeIf { it.hasDetails }?.let { c ->
+                item { ContactCard(c) }
+            }
             if (loan.note.isNotBlank()) {
                 item {
                     Text(loan.note, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
@@ -281,6 +291,16 @@ fun LoanDetailScreen(
 
     val current = item
     if (current != null) {
+        if (statement) {
+            val names = accounts.associate { it.id to it.name }
+            StatementDialog(
+                item = current,
+                me = me,
+                accountNames = current.txns.associate { t -> t.id to names[otherSide(t, current.loan.accountId)].orEmpty() }.filterValues { it.isNotEmpty() },
+                onMyDetails = { statement = false; onMyDetails() },
+                onDismiss = { statement = false },
+            )
+        }
         entry?.let { mode ->
             EntryDialog(
                 item = current,
@@ -532,5 +552,50 @@ private fun EntryDialog(
             onConfirm = { onDelete(editing); onDismiss() },
             onDismiss = { confirmDelete = false },
         )
+    }
+}
+
+/** Who the loan is with: tap the phone to call, the email to write. */
+@Composable
+private fun ContactCard(c: com.saraltechies.saralmoneytracker.model.Contact) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Text(
+                listOf(c.name, stringResource(com.saraltechies.saralmoneytracker.util.StatementPdf.kindLabel(c.kind))).joinToString(" · "),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            if (c.phone.isNotBlank()) {
+                ContactLine(Icons.Filled.Call, c.phone) {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, android.net.Uri.parse("tel:" + c.phone))) }
+                }
+            }
+            if (c.email.isNotBlank()) {
+                ContactLine(Icons.Filled.Email, c.email) {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:" + c.email))) }
+                }
+            }
+            if (c.address.isNotBlank()) ContactLine(Icons.Filled.Place, c.address, null)
+            val bank = listOf(c.bankName, c.bankAccount, c.ifsc).filter { it.isNotBlank() }.joinToString(" · ")
+            if (bank.isNotBlank()) ContactLine(Icons.Filled.AccountBalance, bank, null)
+            if (c.upi.isNotBlank()) ContactLine(Icons.Filled.QrCode, c.upi, null)
+            if (c.taxId.isNotBlank()) ContactLine(Icons.Filled.Badge, c.taxId, null)
+            if (c.reference.isNotBlank()) ContactLine(Icons.Filled.Tag, c.reference, null)
+        }
+    }
+}
+
+@Composable
+private fun ContactLine(icon: ImageVector, text: String, onClick: (() -> Unit)?) {
+    Row(
+        Modifier.fillMaxWidth().let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
     }
 }

@@ -29,6 +29,7 @@ import com.saraltechies.saralmoneytracker.ui.components.LocalCurrency
 import com.saraltechies.saralmoneytracker.ui.components.LocalPeriodPrefs
 import com.saraltechies.saralmoneytracker.ui.components.MainBottomBar
 import com.saraltechies.saralmoneytracker.ui.components.MainTab
+import com.saraltechies.saralmoneytracker.ui.contacts.MyDetailsScreen
 import com.saraltechies.saralmoneytracker.ui.edit.EditScreen
 import com.saraltechies.saralmoneytracker.ui.home.HomeScreen
 import com.saraltechies.saralmoneytracker.ui.importing.ImportScreen
@@ -52,6 +53,7 @@ private object Routes {
     const val RECURRING = "recurring"
     const val IMPORT = "import"
     const val LOANS = "loans"
+    const val MY_DETAILS = "myDetails"
     const val LOAN = "loan/{id}"
     const val LOAN_EDIT = "loanEdit?id={id}&dir={dir}"
 
@@ -217,6 +219,8 @@ fun AppNav(
                     snackbar = snackbar,
                     onBack = { nav.popBackStack() },
                     onCategories = { nav.navigate(Routes.CATEGORIES) },
+                    onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
+                    onLoans = { nav.navigate(Routes.LOANS) },
                     onRecurring = { nav.navigate(Routes.RECURRING) },
                     onImport = { nav.navigate(Routes.IMPORT) },
                 )
@@ -230,6 +234,7 @@ fun AppNav(
                     onAdd = { nav.navigate(Routes.edit(rule = NEW_RULE)) },
                 )
             }
+            composable(Routes.MY_DETAILS) { MyDetailsScreen(repository, onBack = { nav.popBackStack() }) }
             composable(Routes.LOANS) {
                 LoansScreen(
                     repository,
@@ -246,6 +251,7 @@ fun AppNav(
                     loanId = id,
                     onBack = { nav.popBackStack() },
                     onEdit = { nav.navigate(Routes.loanEdit(id = id)) },
+                    onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
                 )
             }
             composable(

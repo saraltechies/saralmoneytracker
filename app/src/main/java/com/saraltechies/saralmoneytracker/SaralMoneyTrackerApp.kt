@@ -4,6 +4,7 @@ import android.app.Application
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
 import com.saraltechies.saralmoneytracker.util.Reminders
+import com.saraltechies.saralmoneytracker.util.StatementFiles
 
 /** Holds the app-wide singletons; small enough that a DI framework isn't worth it. */
 class SaralMoneyTrackerApp : Application() {
@@ -13,5 +14,6 @@ class SaralMoneyTrackerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Reminders.createChannel(this)
+        Thread { StatementFiles.clearOld(this) }.start()
     }
 }

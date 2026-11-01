@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Loan statements, made in the cache to be shared and cleared on the next start. -->
+    <cache-path name="statements" path="statements/" />
+</paths>

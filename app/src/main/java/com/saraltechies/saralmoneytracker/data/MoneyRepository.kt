@@ -4,12 +4,15 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_ACCOUNTS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_CATEGORIES
+import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_CONTACTS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_LOANS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_RECURRING
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_TXNS
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
+import com.saraltechies.saralmoneytracker.model.Contact
+import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.DefaultData
 import com.saraltechies.saralmoneytracker.model.Loan
 import com.saraltechies.saralmoneytracker.model.LoanDirection
@@ -46,7 +49,15 @@ data class ImportOptions(
 )
 
 /** A loan as the screens show it: the person's name, its history and where it stands. */
-data class LoanItem(val loan: Loan, val name: String, val events: List<LoanEvent>, val summary: LoanSummary, val txns: List<Txn>)
+data class LoanItem(
+    val loan: Loan,
+    val name: String,
+    val events: List<LoanEvent>,
+    val summary: LoanSummary,
+    val txns: List<Txn>,
+    /** Who the loan is with, and their details; null only for a loan whose contact was lost. */
+    val contact: Contact? = null,
+)
 
 /** The terms filled in on the loan form. */
 data class LoanTerms(
@@ -161,7 +172,7 @@ class MoneyRepository(private val context: Context) {
         arrayOf(categoryId.toString()),
     ).use { it.moveToFirst() }
 
-    fun exportData() = BackupFormat.Data(accounts(true), categories(true), txns(), recurring(), loans())
+    fun exportData() = BackupFormat.Data(accounts(true), categories(true), txns(), recurring(), loans(), contacts(includeSelf = true))
 
     /** How often each category was used since [since], to put the usual ones first when adding an entry. */
     fun categoryUsage(type: TxnType, since: LocalDate): Map<Long, Int> = db.readableDatabase.rawQuery(
@@ -185,12 +196,13 @@ class MoneyRepository(private val context: Context) {
         val loans = loans()
         if (loans.isEmpty()) return emptyList()
         val accounts = accounts(includeArchived = true, includeLoans = true).associateBy { it.id }
+        val contacts = contacts().associateBy { it.id }
         val byLoan = db.readableDatabase.query(T_TXNS, null, "loan_id IS NOT NULL", null, null, null, "day, created")
             .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.txn(c)) } }.groupBy { it.loanId }
         return loans.map { loan ->
             val account = accounts[loan.accountId]
             val events = LoanMath.events(loan, account?.opening ?: 0, byLoan[loan.id].orEmpty())
-            LoanItem(loan, account?.name.orEmpty(), events, LoanMath.summary(loan, events, asOf), byLoan[loan.id].orEmpty())
+            LoanItem(loan, account?.name.orEmpty(), events, LoanMath.summary(loan, events, asOf), byLoan[loan.id].orEmpty(), loan.contactId?.let { contacts[it] })
         }
     }
 
@@ -310,7 +322,7 @@ class MoneyRepository(private val context: Context) {
 
     /** Deletes everything and starts again with the default accounts and categories. */
     suspend fun deleteAll() = write { w ->
-        listOf(T_TXNS, T_RECURRING, T_LOANS, T_CATEGORIES, T_ACCOUNTS).forEach { w.delete(it, null, null) }
+        listOf(T_TXNS, T_RECURRING, T_LOANS, T_CONTACTS, T_CATEGORIES, T_ACCOUNTS).forEach { w.delete(it, null, null) }
         w.execSQL("DELETE FROM sqlite_sequence")
         db.seed(w)
     }
@@ -321,22 +333,64 @@ class MoneyRepository(private val context: Context) {
      * Records a new loan of [amount]. With [accountId] the money leaves (or arrives in) that account today's way, as
      * a transfer; without it the loan is one from before you used the app, so your balances stay as they are.
      */
-    suspend fun createLoan(terms: LoanTerms, amount: Long, accountId: Long?): Long = write { w ->
+    suspend fun createLoan(terms: LoanTerms, amount: Long, accountId: Long?, contact: Contact): Long = write { w ->
         val sign = if (terms.direction == LoanDirection.LENT) 1 else -1
+        val contactId = saveContactIn(w, contact.copy(name = contact.name.ifBlank { terms.name }))
         val account = Account(
             name = uniqueAccountName(w, terms.name.trim(), exceptId = null), type = AccountType.LOAN,
             opening = if (accountId == null) amount * sign else 0, sort = Int.MAX_VALUE / 2,
         )
         val loanAccount = w.insert(T_ACCOUNTS, null, MoneyDb.values(account))
-        val loanId = w.insert(T_LOANS, null, MoneyDb.values(loanFrom(terms, loanAccount)))
+        val loanId = w.insert(T_LOANS, null, MoneyDb.values(loanFrom(terms, loanAccount).copy(contactId = contactId)))
         if (accountId != null) w.insert(T_TXNS, null, MoneyDb.values(loanTxn(terms.direction, loanAccount, loanId, LoanEventKind.GIVEN, amount, terms.startDate, accountId, "")))
         loanId
     }
 
-    /** Changes the terms or the person's name. */
-    suspend fun updateLoan(loan: Loan, terms: LoanTerms) = write { w ->
-        w.update(T_LOANS, MoneyDb.values(loanFrom(terms, loan.accountId).copy(id = loan.id, closed = loan.closed, createdAt = loan.createdAt)), "id = ?", arrayOf(loan.id.toString()))
+    /** Changes the terms, and who the loan is with and their details. */
+    suspend fun updateLoan(loan: Loan, terms: LoanTerms, contact: Contact) = write { w ->
+        val contactId = saveContactIn(w, contact.copy(name = contact.name.ifBlank { terms.name }))
+        w.update(
+            T_LOANS, MoneyDb.values(loanFrom(terms, loan.accountId).copy(id = loan.id, closed = loan.closed, createdAt = loan.createdAt, contactId = contactId)),
+            "id = ?", arrayOf(loan.id.toString()),
+        )
         w.execSQL("UPDATE $T_ACCOUNTS SET name = ? WHERE id = ?", arrayOf<Any?>(uniqueAccountName(w, terms.name.trim(), loan.accountId), loan.accountId))
+        // The old contact goes once nothing uses it.
+        if (loan.contactId != null && loan.contactId != contactId) deleteContactIfUnused(w, loan.contactId)
+    }
+
+    // ---- Contacts -----------------------------------------------------------------------------------------
+
+    /** People, banks and vendors, by name. Your own details ([ContactKind.SELF]) only with [includeSelf]. */
+    fun contacts(includeSelf: Boolean = false): List<Contact> = db.readableDatabase.query(
+        T_CONTACTS, null, if (includeSelf) null else "kind != '${ContactKind.SELF.name}'", null, null, null, "name COLLATE NOCASE, id",
+    ).use { c -> buildList { while (c.moveToNext()) add(MoneyDb.contact(c)) } }
+
+    /** Your own details for statements: name or business, address, bank and UPI. */
+    fun myDetails(): Contact? = db.readableDatabase.query(T_CONTACTS, null, "kind = ?", arrayOf(ContactKind.SELF.name), null, null, "id", "1")
+        .use { c -> if (c.moveToFirst()) MoneyDb.contact(c) else null }
+
+    suspend fun saveMyDetails(details: Contact) = write { w ->
+        val existing = w.query(T_CONTACTS, arrayOf("id"), "kind = ?", arrayOf(ContactKind.SELF.name), null, null, "id", "1")
+            .use { c -> if (c.moveToFirst()) c.getLong(0) else 0L }
+        saveContactIn(w, details.copy(id = existing, kind = ContactKind.SELF))
+    }
+
+    /** Saves a contact and keeps the names of its loans' accounts in step. Returns its id. */
+    private fun saveContactIn(w: SQLiteDatabase, contact: Contact): Long {
+        val c = contact.trimmed()
+        if (c.id == 0L) return w.insert(T_CONTACTS, null, MoneyDb.values(c))
+        w.update(T_CONTACTS, MoneyDb.values(c), "id = ?", arrayOf(c.id.toString()))
+        if (c.kind != ContactKind.SELF) {
+            val accounts = w.rawQuery("SELECT account_id FROM $T_LOANS WHERE contact_id = ?", arrayOf(c.id.toString()))
+                .use { cur -> buildList { while (cur.moveToNext()) add(cur.getLong(0)) } }
+            for (a in accounts) w.execSQL("UPDATE $T_ACCOUNTS SET name = ? WHERE id = ?", arrayOf<Any?>(uniqueAccountName(w, c.name, a), a))
+        }
+        return c.id
+    }
+
+    private fun deleteContactIfUnused(w: SQLiteDatabase, contactId: Long) {
+        val used = w.rawQuery("SELECT 1 FROM $T_LOANS WHERE contact_id = ? LIMIT 1", arrayOf(contactId.toString())).use { it.moveToFirst() }
+        if (!used) w.delete(T_CONTACTS, "id = ? AND kind != ?", arrayOf(contactId.toString(), ContactKind.SELF.name))
     }
 
     /**
@@ -373,6 +427,7 @@ class MoneyRepository(private val context: Context) {
         w.delete(T_TXNS, "loan_id = ?", arrayOf(loan.id.toString()))
         w.delete(T_LOANS, "id = ?", arrayOf(loan.id.toString()))
         w.delete(T_ACCOUNTS, "id = ?", arrayOf(loan.accountId.toString()))
+        loan.contactId?.let { deleteContactIfUnused(w, it) }
     }
 
     private fun loanFrom(terms: LoanTerms, accountId: Long) = Loan(
@@ -466,6 +521,19 @@ class MoneyRepository(private val context: Context) {
 
         for (a in result.accounts) account(a.name, a.type, a.opening, a.archived)
 
+        // Contacts from a backup, matched to ones already here by name. Your own details only fill in if you have none.
+        val existingContacts = w.query(T_CONTACTS, null, null, null, null, null, null)
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.contact(c)) } }
+        val contactIds = HashMap<String, Long>()
+        for (c in result.contacts) {
+            val id = if (c.kind == ContactKind.SELF) {
+                existingContacts.firstOrNull { it.kind == ContactKind.SELF }?.id ?: w.insert(T_CONTACTS, null, MoneyDb.values(c.trimmed()))
+            } else {
+                existingContacts.firstOrNull { it.kind != ContactKind.SELF && key(it.name) == key(c.name) }?.id
+                    ?: w.insert(T_CONTACTS, null, MoneyDb.values(c.trimmed()))
+            }
+            if (c.kind != ContactKind.SELF) contactIds[key(c.name)] = id
+        }
         // Loans from a backup: each has its own account (already created above); link to it, or reuse the same loan.
         val loansByAccount = w.query(T_LOANS, null, null, null, null, null, null)
             .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.loan(c)) } }.associateBy { it.accountId }.toMutableMap()
@@ -478,6 +546,7 @@ class MoneyRepository(private val context: Context) {
                     Loan(
                         accountId = accountId, direction = l.direction, startDate = l.startDate, rate = l.rate, rateUnit = l.rateUnit, plan = l.plan,
                         installments = l.installments, installment = l.installment, note = l.note, closed = l.closed,
+                        contactId = (l.contact ?: l.name).let { contactIds[key(it)] } ?: w.insert(T_CONTACTS, null, MoneyDb.values(Contact(name = l.name))),
                     ),
                 ),
             ).also { id -> loansByAccount[accountId] = Loan(id = id, accountId = accountId, direction = l.direction, startDate = l.startDate) }

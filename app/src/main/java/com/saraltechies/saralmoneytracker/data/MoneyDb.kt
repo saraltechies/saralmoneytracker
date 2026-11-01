@@ -9,6 +9,8 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.Category
+import com.saraltechies.saralmoneytracker.model.Contact
+import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.DefaultData
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Loan
@@ -21,7 +23,7 @@ import com.saraltechies.saralmoneytracker.model.TxnType
 import java.time.LocalDate
 
 /**
- * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only five tables.
+ * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only six tables.
  * Dates are stored as epoch days, amounts as hundredths.
  */
 class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, null, VERSION) {
@@ -49,6 +51,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         )
         db.execSQL("CREATE INDEX txns_day ON txns(day)")
         createLoans(db)
+        createContacts(db)
         db.execSQL(
             """CREATE TABLE recurring (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, amount INTEGER NOT NULL, category_id INTEGER,
@@ -63,6 +66,28 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             db.execSQL("ALTER TABLE txns ADD COLUMN loan_id INTEGER")
             createLoans(db)
         }
+        if (oldVersion < 3) {
+            createContacts(db)
+            // Every existing loan gets a contact with its person's name, so details can be added to it.
+            db.rawQuery("SELECT l.id, a.name FROM loans l LEFT JOIN accounts a ON a.id = l.account_id", null).use { c ->
+                while (c.moveToNext()) {
+                    val contact = db.insert(T_CONTACTS, null, values(Contact(name = c.getString(1) ?: "?")))
+                    db.execSQL("UPDATE loans SET contact_id = ? WHERE id = ?", arrayOf<Any?>(contact, c.getLong(0)))
+                }
+            }
+        }
+    }
+
+    /** Version 3: details of the people, banks and vendors loans are with, and your own (kind SELF). */
+    private fun createContacts(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, kind TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '',
+                email TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', tax_id TEXT NOT NULL DEFAULT '',
+                bank_name TEXT NOT NULL DEFAULT '', bank_account TEXT NOT NULL DEFAULT '', ifsc TEXT NOT NULL DEFAULT '',
+                upi TEXT NOT NULL DEFAULT '', reference TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '')""",
+        )
+        db.execSQL("ALTER TABLE loans ADD COLUMN contact_id INTEGER")
     }
 
     /** Version 2: money lent and borrowed. */
@@ -90,12 +115,13 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
 
     companion object {
         const val NAME = "money.db"
-        const val VERSION = 2
+        const val VERSION = 3
         const val T_ACCOUNTS = "accounts"
         const val T_CATEGORIES = "categories"
         const val T_TXNS = "txns"
         const val T_RECURRING = "recurring"
         const val T_LOANS = "loans"
+        const val T_CONTACTS = "contacts"
 
         fun values(a: Account) = ContentValues().apply {
             if (a.id != 0L) put("id", a.id)
@@ -159,6 +185,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("note", l.note)
             put("closed", if (l.closed) 1 else 0)
             put("created", if (l.createdAt != 0L) l.createdAt else System.currentTimeMillis())
+            if (l.contactId != null) put("contact_id", l.contactId) else putNull("contact_id")
         }
 
         fun loan(c: Cursor) = Loan(
@@ -174,6 +201,39 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             note = c.str("note"),
             closed = c.int("closed") != 0,
             createdAt = c.long("created"),
+            contactId = c.longOrNull("contact_id"),
+        )
+
+        fun values(c: Contact) = ContentValues().apply {
+            if (c.id != 0L) put("id", c.id)
+            put("name", c.name)
+            put("kind", c.kind.name)
+            put("phone", c.phone)
+            put("email", c.email)
+            put("address", c.address)
+            put("tax_id", c.taxId)
+            put("bank_name", c.bankName)
+            put("bank_account", c.bankAccount)
+            put("ifsc", c.ifsc)
+            put("upi", c.upi)
+            put("reference", c.reference)
+            put("note", c.note)
+        }
+
+        fun contact(c: Cursor) = Contact(
+            id = c.long("id"),
+            name = c.str("name"),
+            kind = ContactKind.entries.firstOrNull { it.name == c.str("kind") } ?: ContactKind.PERSON,
+            phone = c.str("phone"),
+            email = c.str("email"),
+            address = c.str("address"),
+            taxId = c.str("tax_id"),
+            bankName = c.str("bank_name"),
+            bankAccount = c.str("bank_account"),
+            ifsc = c.str("ifsc"),
+            upi = c.str("upi"),
+            reference = c.str("reference"),
+            note = c.str("note"),
         )
 
         private fun Cursor.long(name: String) = getLong(getColumnIndexOrThrow(name))

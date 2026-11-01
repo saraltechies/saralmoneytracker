@@ -422,6 +422,8 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         sectionTitle(s(R.string.pdf_loans))
         tableHeader(header, loanCols, rightAlignedFrom = 3)
         val sorted = person.loans.sortedWith(compareBy({ it.loan.closed }, { it.loan.startDate }))
+        // "Lent" or "Borrowed" only matters when they have loans both ways; otherwise the column has room for the security.
+        val bothWays = person.loans.map { it.loan.direction }.distinct().size > 1
         sorted.forEachIndexed { i, item ->
             if (y + 16f > bottomLimit) {
                 newPage()
@@ -430,7 +432,8 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
             val loan = item.loan
             val lent = loan.direction == LoanDirection.LENT
             val what = listOfNotNull(
-                s(if (lent) R.string.pdf_money_lent else R.string.pdf_money_borrowed) + " " + m(item.summary.given),
+                s(if (lent) R.string.loans_lent else R.string.loans_borrowed).takeIf { bothWays },
+                m(item.summary.given),
                 loan.pledge?.let { Pledges.summary(context, it, withItems = false) },
             ).joinToString(" · ")
             val outstanding = when {

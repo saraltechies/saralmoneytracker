@@ -6,9 +6,6 @@ import com.saraltechies.saralmoneytracker.data.LoanItem
 import com.saraltechies.saralmoneytracker.data.PersonLoans
 import com.saraltechies.saralmoneytracker.model.Pledge
 import com.saraltechies.saralmoneytracker.model.PledgeKind
-import com.saraltechies.saralmoneytracker.data.PersonLoans
-import com.saraltechies.saralmoneytracker.model.Pledge
-import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.Currencies

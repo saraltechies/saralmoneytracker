@@ -76,7 +76,7 @@ fun BudgetsScreen(repository: MoneyRepository, bottomBar: @Composable () -> Unit
     val prefs = LocalPeriodPrefs.current
     var period by rememberPeriod(PeriodKind.MONTH)
     val data by remember(period) {
-        repository.watch { repository.categories() to repository.txns(period.start, period.end) }
+        repository.watch { repository.categories() to repository.txns(period.start, period.end, profitAndLoss = true) }
     }.collectAsStateWithLifecycle(null)
     var editing by remember { mutableStateOf<Category?>(null) }
 

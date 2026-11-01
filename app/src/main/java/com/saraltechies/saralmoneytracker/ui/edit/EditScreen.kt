@@ -81,13 +81,16 @@ import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AmountExpression
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
+import com.saraltechies.saralmoneytracker.ui.components.BookChips
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
+import com.saraltechies.saralmoneytracker.ui.components.LocalBooks
 import com.saraltechies.saralmoneytracker.ui.components.ChoiceDialog
 import com.saraltechies.saralmoneytracker.ui.components.ConfirmDialog
 import com.saraltechies.saralmoneytracker.ui.components.DatePickDialog
@@ -122,8 +125,8 @@ fun EditScreen(
 ) {
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
-    val categories by remember { repository.watch { repository.categories() } }.collectAsStateWithLifecycle(emptyList())
-    val accounts by remember { repository.watch { repository.accounts() } }.collectAsStateWithLifecycle(emptyList())
+    val categories by remember { repository.watch { repository.categories(book = Books.ALL) } }.collectAsStateWithLifecycle(emptyList())
+    val accounts by remember { repository.watch { repository.accounts(book = Books.ALL) } }.collectAsStateWithLifecycle(emptyList())
 
     var loaded by rememberSaveable { mutableStateOf(false) }
     var type by rememberSaveable { mutableStateOf(initialType) }
@@ -133,6 +136,9 @@ fun EditScreen(
     var toAccountId by rememberSaveable { mutableStateOf<Long?>(null) }
     var dateDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
     var note by rememberSaveable { mutableStateOf("") }
+    val books = LocalBooks.current
+    var bookId by rememberSaveable { mutableStateOf(books.defaultBook) }
+    var bookChanged by remember { mutableStateOf(false) }
     var repeat by rememberSaveable { mutableStateOf<Frequency?>(null) }
     var original by remember { mutableStateOf<Txn?>(null) }
     var originalRule by remember { mutableStateOf<Recurring?>(null) }
@@ -154,6 +160,9 @@ fun EditScreen(
                 repository.txns(limit = 30),
             )
         }
+        // Categories and accounts of every book, read now: the lists on screen may not have arrived yet.
+        val allCats = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.categories(true, book = Books.ALL) }
+        val allAccs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.accounts(true, book = Books.ALL) }
         when {
             // Loan entries are changed on the loan's own screen, where the interest and balance are worked out.
             txn?.loanId != null -> {
@@ -165,6 +174,7 @@ fun EditScreen(
                 type = txn.type
                 expr = Money.plain(txn.amount)
                 categoryId = txn.categoryId
+                (txn.categoryId?.let { id -> allCats.firstOrNull { it.id == id }?.bookId } ?: allAccs.firstOrNull { it.id == txn.accountId }?.bookId)?.let { bookId = it }
                 accountId = txn.accountId
                 toAccountId = txn.toAccountId
                 dateDay = txn.date.toEpochDay()
@@ -175,6 +185,7 @@ fun EditScreen(
                 type = rule.type
                 expr = Money.plain(rule.amount)
                 categoryId = rule.categoryId
+                rule.categoryId?.let { id -> allCats.firstOrNull { it.id == id }?.bookId }?.let { bookId = it }
                 accountId = rule.accountId
                 toAccountId = rule.toAccountId
                 dateDay = rule.nextDate.toEpochDay()
@@ -183,8 +194,11 @@ fun EditScreen(
             }
             else -> {
                 val own = recent.filter { it.loanId == null }
-                val last = own.firstOrNull { it.type == type }
-                accountId = last?.accountId ?: own.firstOrNull()?.accountId
+                // The last entry of this kind in this book gives the usual account and category.
+                fun inBook(t: Txn) = t.categoryId?.let { id -> allCats.firstOrNull { it.id == id }?.bookId } == bookId ||
+                    (t.categoryId == null && allAccs.firstOrNull { it.id == t.accountId }?.bookId == bookId)
+                val last = own.firstOrNull { it.type == type && inBook(it) }
+                accountId = last?.accountId ?: own.firstOrNull { inBook(it) }?.accountId ?: allAccs.firstOrNull { it.bookId == bookId && !it.archived && it.type != com.saraltechies.saralmoneytracker.model.AccountType.LOAN }?.id
                 toAccountId = last?.toAccountId
                 categoryId = last?.categoryId
                 if (isRule) repeat = Frequency.MONTHLY
@@ -193,7 +207,12 @@ fun EditScreen(
         loaded = true
     }
 
-    val kindCategories = categories.filter { it.kind == type }
+    val kindCategories = categories.filter { it.kind == type && it.bookId == bookId }
+    // Switching book picks one of its accounts; a business bill can still be paid from a personal account by choosing it.
+    LaunchedEffect(bookId) {
+        if (!loaded || !bookChanged) return@LaunchedEffect
+        if (accounts.firstOrNull { it.id == accountId }?.bookId != bookId) accounts.firstOrNull { it.bookId == bookId }?.let { accountId = it.id }
+    }
     // The categories you use most come first, so the usual one is a tap away and the full list stays out of the way.
     val usage by remember(type) { repository.watch { repository.categoryUsage(type, LocalDate.now().minusDays(120)) } }
         .collectAsStateWithLifecycle(emptyMap())
@@ -283,6 +302,7 @@ fun EditScreen(
                 }
             }
 
+            if (type != TxnType.TRANSFER) BookChips(bookId, onSelect = { bookId = it; bookChanged = true; error = null }, modifier = Modifier.padding(top = 8.dp))
             AmountDisplay(expr, amount, color)
             error?.let {
                 Text(
@@ -354,9 +374,9 @@ fun EditScreen(
     if (pickAccount != 0) {
         ChoiceDialog(
             title = stringResource(if (pickAccount == 2) R.string.to_account else if (type == TxnType.TRANSFER) R.string.from_account else R.string.account),
-            options = accounts,
+            options = accounts.sortedBy { if (it.bookId == bookId) 0 else 1 },
             selected = accounts.firstOrNull { it.id == (if (pickAccount == 2) toAccountId else accountId) },
-            label = { it.name },
+            label = { a -> if (books.multiple) a.name + " · " + books.book(a.bookId)?.name.orEmpty() else a.name },
             leading = { IconBadge(CategoryIcons.account(it.type), MaterialTheme.colorScheme.primary, size = 32.dp) },
             onPick = { if (pickAccount == 2) toAccountId = it.id else accountId = it.id },
             onDismiss = { pickAccount = 0 },

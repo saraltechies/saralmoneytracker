@@ -23,6 +23,8 @@ data class Contact(
     /** A bank's loan account number, an agreement number, or any reference. */
     val reference: String = "",
     val note: String = "",
+    /** For your own details ([ContactKind.SELF]): the book they are for, so each business has its own. */
+    val bookId: Long = Books.PERSONAL_ID,
 ) {
     /** True when there is something besides the name worth printing. */
     val hasDetails: Boolean

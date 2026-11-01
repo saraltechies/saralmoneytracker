@@ -172,6 +172,8 @@ fun ImportScreen(repository: MoneyRepository, onBack: () -> Unit, onDone: () -> 
                         onClick = {
                             val options = ImportOptions(
                                 defaultAccountId = account!!.id,
+                                // Rows go to the book of the account they are imported into.
+                                bookId = account!!.bookId,
                                 cardBillsAsTransfers = cardAsTransfers,
                                 useBudgets = useBudgets,
                                 cardAccountName = context.getString(R.string.default_account_card),

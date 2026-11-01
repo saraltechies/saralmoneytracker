@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Recurrence
 import com.saraltechies.saralmoneytracker.model.TxnType
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
@@ -56,7 +57,7 @@ import java.time.LocalDate
 fun RecurringScreen(repository: MoneyRepository, onBack: () -> Unit, onOpen: (Long) -> Unit, onAdd: () -> Unit) {
     val scope = rememberCoroutineScope()
     val data by remember {
-        repository.watch { repository.recurring() to Lookups(repository.categories(true), repository.accounts(true)) }
+        repository.watch { repository.recurring() to Lookups(repository.categories(true, book = Books.ALL), repository.accounts(true, book = Books.ALL), repository.loanDirections(), repository.books()) }
     }.collectAsStateWithLifecycle(null)
 
     Scaffold(

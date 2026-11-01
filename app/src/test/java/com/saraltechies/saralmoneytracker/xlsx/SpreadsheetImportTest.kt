@@ -3,6 +3,8 @@ package com.saraltechies.saralmoneytracker.xlsx
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Book
+import com.saraltechies.saralmoneytracker.model.BookKind
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
@@ -224,6 +226,34 @@ class SpreadsheetImportTest {
         assertEquals(ContactKind.BANK, result.contacts.single { it.name == "HDFC Bank" }.kind)
         assertEquals("LN/2026/778", result.contacts.single { it.name == "HDFC Bank" }.reference)
         assertEquals(listOf("Ravi", "HDFC Bank"), result.loans.map { it.contact })
+    }
+
+    @Test
+    fun backupKeepsBooks() {
+        val books = listOf(Book(id = 1, name = "Personal", kind = BookKind.PERSONAL), Book(id = 2, name = "Sharma Traders", kind = BookKind.BUSINESS))
+        val accounts = listOf(
+            Account(id = 1, name = "Cash", type = AccountType.CASH, bookId = 1),
+            Account(id = 2, name = "Shop current", type = AccountType.BANK, bookId = 2),
+        )
+        val categories = listOf(
+            Category(id = 10, name = "Rent", kind = TxnType.EXPENSE, icon = "home", color = 0, bookId = 1),
+            Category(id = 20, name = "Rent", kind = TxnType.EXPENSE, icon = "home", color = 0, bookId = 2),
+        )
+        val txns = listOf(
+            Txn(type = TxnType.EXPENSE, amount = 1_500_000, date = d("2026-04-05"), categoryId = 20, accountId = 1),
+            Txn(type = TxnType.EXPENSE, amount = 1_000_000, date = d("2026-04-05"), categoryId = 10, accountId = 1),
+        )
+        val contacts = listOf(Contact(id = 1, name = "Sharma Traders", kind = ContactKind.SELF, taxId = "09ABCDE1234F1Z5", bookId = 2))
+        val out = ByteArrayOutputStream()
+        BackupFormat.writeXlsx(BackupFormat.Data(accounts, categories, txns, emptyList(), emptyList(), contacts, books), out, d("2026-05-01"), "1.3.0")
+        val result = SpreadsheetImport.read(XlsxReader.read(ByteArrayInputStream(out.toByteArray())))
+
+        assertEquals(listOf("Personal" to BookKind.PERSONAL, "Sharma Traders" to BookKind.BUSINESS), result.books.map { it.name to it.kind })
+        assertEquals("Sharma Traders", result.accounts.single { it.name == "Shop current" }.book)
+        assertEquals(listOf("Personal", "Sharma Traders"), result.categories.map { it.book })
+        // Same category name in two books: each entry keeps its own book, so neither is taken for a copy of the other.
+        assertEquals(setOf("Personal", "Sharma Traders"), result.rows.map { it.book }.toSet())
+        assertEquals(listOf("Sharma Traders"), result.contactBooks)
     }
 
     @Test

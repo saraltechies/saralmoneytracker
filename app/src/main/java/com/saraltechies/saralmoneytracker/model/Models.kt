@@ -18,6 +18,8 @@ data class Account(
     val opening: Long = 0,
     val archived: Boolean = false,
     val sort: Int = 0,
+    /** The [Book] it belongs to. */
+    val bookId: Long = Books.PERSONAL_ID,
 )
 
 data class Category(
@@ -32,6 +34,8 @@ data class Category(
     val budget: Long? = null,
     val archived: Boolean = false,
     val sort: Int = 0,
+    /** The [Book] it belongs to; its income or expense counts there. */
+    val bookId: Long = Books.PERSONAL_ID,
 )
 
 /**

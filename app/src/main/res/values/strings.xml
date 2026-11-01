@@ -589,6 +589,85 @@
     <string name="pdf_sender_fallback">the sender</string>
     <string name="pdf_closing_note">This statement was prepared by %1$s from their own records. If anything here doesn\'t match yours, please get in touch.</string>
 
+    <!-- Books: personal and business money kept apart -->
+    <string name="book_personal">Personal</string>
+    <string name="book_kind_personal">Personal</string>
+    <string name="book_kind_business">Business</string>
+    <string name="books_title">Personal &amp; business books</string>
+    <string name="books_summary">Keep your business money apart from your own</string>
+    <string name="books_all">All books</string>
+    <string name="books_all_hint">Showing every book</string>
+    <string name="books_switch">Switch book</string>
+    <string name="books_manage">Manage books</string>
+    <string name="books_showing">Showing now</string>
+    <string name="books_add">Add a book</string>
+    <string name="books_edit">Edit book</string>
+    <string name="books_name">Name</string>
+    <string name="books_business_name">Business name</string>
+    <string name="books_intro_title">One app for your own money and your business</string>
+    <string name="books_intro">Each book has its own accounts, categories, budgets, loans and reports. Switch books from the top of the home screen, or see all of them together.\n\nA business bill paid from your personal account counts as a business expense. Money you move from personal to business is capital you put in; money you take out is drawings. Neither counts as income or spending.</string>
+    <string name="books_new_business_hint">Starts with business categories (sales, purchases, rent, salaries, GST and more) and a business cash and bank account.</string>
+    <string name="books_new_personal_hint">Starts with the usual personal categories and its own cash and bank account.</string>
+    <string name="books_deleted">Book deleted</string>
+    <string name="books_has_history">This book has entries or loans, so it can\'t be deleted. Delete those first.</string>
+    <string name="default_business_cash">Business cash</string>
+    <string name="default_business_bank">Business bank</string>
+    <string name="my_details_business_name">Business name</string>
+    <string name="my_details_intro_business">These appear at the top of this business\'s loan statements and reports: name, address, GSTIN, and the bank and UPI details people pay into. They stay on this phone.</string>
+    <string name="txn_capital_in">Put into %1$s</string>
+    <string name="txn_drawings">Taken from %1$s</string>
+    <string name="txn_between_books">Moved to %1$s</string>
+
+    <!-- Book reports -->
+    <string name="report_action">Report (PDF)</string>
+    <string name="report_title_business">Profit and loss</string>
+    <string name="report_title_personal">Income and expenses</string>
+    <string name="report_intro_business">A PDF of %1$s\'s sales, expenses and profit, money put in and taken out, account balances and loans, for your records, your accountant or your bank.</string>
+    <string name="report_intro_personal">A PDF of the income and expenses of %1$s, with account balances and loans.</string>
+    <string name="report_details_hint">Your name, address and GSTIN on the report come from Your details. Tap to check them.</string>
+    <string name="report_income">Income</string>
+    <string name="report_sales_income">Sales and income</string>
+    <string name="report_expenses">Expenses</string>
+    <string name="report_profit">Profit</string>
+    <string name="report_loss">Loss</string>
+    <string name="report_saved">Saved</string>
+    <string name="report_overspent">Overspent</string>
+    <string name="report_total">Total</string>
+    <string name="report_nothing">Nothing in this period</string>
+    <string name="report_between_books">Money between your books</string>
+    <string name="report_capital_in">Capital put in</string>
+    <string name="report_drawings">Drawings (taken out)</string>
+    <string name="report_from_business">From your businesses</string>
+    <string name="report_to_business">Put into your businesses</string>
+    <string name="report_balances">Account balances on %1$s</string>
+    <string name="report_note">Prepared from the owner\'s own records with Saral Money Tracker. Income and expenses are counted on the date they were recorded. This is not an audited statement.</string>
+
+    <string-array name="default_business_expense_categories">
+        <item>Purchases &amp; Stock</item>
+        <item>Rent</item>
+        <item>Salaries &amp; Wages</item>
+        <item>Electricity</item>
+        <item>Transport &amp; Freight</item>
+        <item>Fuel</item>
+        <item>Phone &amp; Internet</item>
+        <item>Office &amp; Supplies</item>
+        <item>Marketing</item>
+        <item>Repairs &amp; Maintenance</item>
+        <item>Taxes, GST &amp; Fees</item>
+        <item>Bank Charges</item>
+        <item>Interest on Loans</item>
+        <item>Professional Fees</item>
+        <item>Business Travel</item>
+        <item>Other Expenses</item>
+    </string-array>
+    <string-array name="default_business_income_categories">
+        <item>Sales</item>
+        <item>Services</item>
+        <item>Interest Received</item>
+        <item>Refunds &amp; Discounts</item>
+        <item>Other Income</item>
+    </string-array>
+
     <string-array name="default_expense_categories">
         <item>Food &amp; Dining</item>
         <item>Groceries</item>

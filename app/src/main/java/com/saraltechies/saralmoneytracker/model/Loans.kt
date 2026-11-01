@@ -38,6 +38,7 @@ data class Loan(
     val note: String = "",
     val closed: Boolean = false,
     val createdAt: Long = 0,
+    val bookId: Long = Books.PERSONAL_ID,
     /** The person, bank or vendor this loan is with, and their details. */
     val contactId: Long? = null,
 )

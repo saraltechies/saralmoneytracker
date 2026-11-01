@@ -6,7 +6,9 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
@@ -19,12 +21,16 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.AppPrefs
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.PeriodKind
 import com.saraltechies.saralmoneytracker.model.TxnType
 import com.saraltechies.saralmoneytracker.ui.accounts.AccountsScreen
+import com.saraltechies.saralmoneytracker.ui.books.BooksScreen
 import com.saraltechies.saralmoneytracker.ui.budgets.BudgetsScreen
 import com.saraltechies.saralmoneytracker.ui.categories.CategoriesScreen
+import com.saraltechies.saralmoneytracker.ui.components.BookState
+import com.saraltechies.saralmoneytracker.ui.components.LocalBooks
 import com.saraltechies.saralmoneytracker.ui.components.LocalCurrency
 import com.saraltechies.saralmoneytracker.ui.components.LocalPeriodPrefs
 import com.saraltechies.saralmoneytracker.ui.components.MainBottomBar
@@ -54,6 +60,7 @@ private object Routes {
     const val IMPORT = "import"
     const val LOANS = "loans"
     const val MY_DETAILS = "myDetails"
+    const val BOOKS = "books"
     const val LOAN = "loan/{id}"
     const val LOAN_EDIT = "loanEdit?id={id}&dir={dir}"
 
@@ -93,7 +100,14 @@ fun AppNav(
 
     val bottomBar: @Composable (MainTab) -> Unit = { tab -> MainBottomBar(tab) { nav.openTab(it) } }
 
-    CompositionLocalProvider(LocalCurrency provides prefs.currency, LocalPeriodPrefs provides prefs.period) {
+    val books by remember { repository.watch { repository.books() } }.collectAsStateWithLifecycle(emptyList())
+    // With one book, or a book that was deleted, every screen shows everything.
+    val currentBook = prefs.book.takeIf { id -> books.size > 1 && books.any { it.id == id } } ?: Books.ALL
+    remember(currentBook) { repository.setBook(currentBook) }
+    val bookState = BookState(books, currentBook)
+    val selectBook: (Long) -> Unit = { id -> appScope.launch { settings.setBook(id) } }
+
+    CompositionLocalProvider(LocalCurrency provides prefs.currency, LocalPeriodPrefs provides prefs.period, LocalBooks provides bookState) {
         NavHost(nav, startDestination = MainTab.HOME.route) {
             composable(MainTab.HOME.route) {
                 HomeScreen(
@@ -114,6 +128,8 @@ fun AppNav(
                     onImport = { nav.navigate(Routes.IMPORT) },
                     onOpenLoans = { nav.navigate(Routes.LOANS) },
                     onOpenLoan = { nav.navigate(Routes.loan(it)) },
+                    onSelectBook = selectBook,
+                    onManageBooks = { nav.navigate(Routes.BOOKS) },
                     updateReady = updateReady,
                     onRestartForUpdate = onRestartForUpdate,
                     onReviewMoment = onReviewMoment,
@@ -165,7 +181,7 @@ fun AppNav(
                 )
             }
             composable(MainTab.STATS.route) {
-                StatsScreen(repository, bottomBar = { bottomBar(MainTab.STATS) }, onOpenCategory = { nav.navigate("category/$it") })
+                StatsScreen(repository, bottomBar = { bottomBar(MainTab.STATS) }, onOpenCategory = { nav.navigate("category/$it") }, onMyDetails = { nav.navigate(Routes.MY_DETAILS) })
             }
             composable(MainTab.BUDGETS.route) {
                 BudgetsScreen(repository, bottomBar = { bottomBar(MainTab.BUDGETS) })
@@ -221,6 +237,7 @@ fun AppNav(
                     onCategories = { nav.navigate(Routes.CATEGORIES) },
                     onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
                     onLoans = { nav.navigate(Routes.LOANS) },
+                    onBooks = { nav.navigate(Routes.BOOKS) },
                     onRecurring = { nav.navigate(Routes.RECURRING) },
                     onImport = { nav.navigate(Routes.IMPORT) },
                 )
@@ -235,6 +252,7 @@ fun AppNav(
                 )
             }
             composable(Routes.MY_DETAILS) { MyDetailsScreen(repository, onBack = { nav.popBackStack() }) }
+            composable(Routes.BOOKS) { BooksScreen(repository, snackbar, onBack = { nav.popBackStack() }, onSelect = selectBook) }
             composable(Routes.LOANS) {
                 LoansScreen(
                     repository,

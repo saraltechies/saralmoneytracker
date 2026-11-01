@@ -58,12 +58,14 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.AppPrefs
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.PeriodKind
 import com.saraltechies.saralmoneytracker.model.Periods
 import com.saraltechies.saralmoneytracker.model.Recurrence
 import com.saraltechies.saralmoneytracker.model.Stats
 import com.saraltechies.saralmoneytracker.model.TxnType
+import com.saraltechies.saralmoneytracker.ui.components.BookSwitcher
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
 import com.saraltechies.saralmoneytracker.ui.components.Dates
 import com.saraltechies.saralmoneytracker.ui.components.IconBadge
@@ -115,6 +117,8 @@ fun HomeScreen(
     onImport: () -> Unit,
     onOpenLoans: () -> Unit,
     onOpenLoan: (Long) -> Unit,
+    onSelectBook: (Long) -> Unit,
+    onManageBooks: () -> Unit,
     updateReady: Boolean,
     onRestartForUpdate: () -> Unit,
     onReviewMoment: () -> Unit,
@@ -127,26 +131,28 @@ fun HomeScreen(
         repository.watch {
             val from = minOf(month.start, week.start)
             val to = maxOf(month.end, week.end)
-            val txns = repository.txns(from, to)
+            // Totals, budget and top spending count what belongs to the book; the balance is of its accounts.
+            val txns = repository.txns(from, to, profitAndLoss = true)
             val monthTxns = txns.filter { it.date in month }
             val totals = Stats.totals(monthTxns)
-            val categories = repository.categories(includeArchived = true)
-            val accounts = repository.accounts(includeArchived = true)
+            val categories = repository.categories(includeArchived = true, book = Books.ALL)
+            val accounts = repository.accounts(includeArchived = true, book = Books.ALL)
+            val bookAccounts = repository.accounts().map { it.id }.toSet()
             val balances = repository.balances()
             HomeData(
                 monthIncome = totals.income,
                 monthExpense = totals.expense,
                 todayExpense = Stats.totals(txns.filter { it.date == today }).expense,
                 weekExpense = Stats.totals(txns.filter { it.date in week }).expense,
-                totalBalance = accounts.filter { !it.archived && it.type != com.saraltechies.saralmoneytracker.model.AccountType.LOAN }.sumOf { balances[it.id] ?: 0 },
+                totalBalance = bookAccounts.sumOf { balances[it] ?: 0 },
                 txnCount = repository.txnCount(),
-                budget = Stats.budget(categories.filter { !it.archived }, monthTxns, month, today),
+                budget = Stats.budget(repository.categories(), monthTxns, month, today),
                 top = Stats.byCategory(monthTxns, TxnType.EXPENSE).take(4),
                 recent = repository.txns(limit = 6),
                 upcoming = repository.recurring()
                     .flatMap { r -> Recurrence.upcoming(r, today, 7).map { it to r } }
                     .sortedBy { it.first }.take(5),
-                lookups = Lookups(categories, accounts, repository.loanDirections()),
+                lookups = Lookups(categories, accounts, repository.loanDirections(), repository.books()),
                 loans = repository.loanItems(today).filter { !it.loan.closed },
                 loaded = true,
             )
@@ -160,7 +166,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
+                title = { BookSwitcher(stringResource(R.string.app_name), onSelect = onSelectBook, onManage = onManageBooks) },
                 actions = {
                     IconButton(onClick = onOpenLoans) { Icon(Icons.Filled.Handshake, stringResource(R.string.loans_title)) }
                     IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, stringResource(R.string.search)) }

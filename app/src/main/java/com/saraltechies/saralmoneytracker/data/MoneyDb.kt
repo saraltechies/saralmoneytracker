@@ -8,6 +8,9 @@ import android.database.sqlite.SQLiteOpenHelper
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Book
+import com.saraltechies.saralmoneytracker.model.BookKind
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
@@ -23,7 +26,7 @@ import com.saraltechies.saralmoneytracker.model.TxnType
 import java.time.LocalDate
 
 /**
- * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only six tables.
+ * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only seven tables.
  * Dates are stored as epoch days, amounts as hundredths.
  */
 class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, null, VERSION) {
@@ -58,6 +61,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
                 account_id INTEGER NOT NULL, to_account_id INTEGER, note TEXT NOT NULL DEFAULT '', frequency TEXT NOT NULL,
                 start_day INTEGER NOT NULL, next_day INTEGER NOT NULL, end_day INTEGER, active INTEGER NOT NULL DEFAULT 1)""",
         )
+        createBooks(db)
         seed(db)
     }
 
@@ -71,10 +75,25 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             // Every existing loan gets a contact with its person's name, so details can be added to it.
             db.rawQuery("SELECT l.id, a.name FROM loans l LEFT JOIN accounts a ON a.id = l.account_id", null).use { c ->
                 while (c.moveToNext()) {
-                    val contact = db.insert(T_CONTACTS, null, values(Contact(name = c.getString(1) ?: "?")))
+                    // Only the columns version 3 has; later versions add more.
+                    val row = ContentValues().apply { put("name", c.getString(1) ?: "?"); put("kind", ContactKind.PERSON.name) }
+                    val contact = db.insert(T_CONTACTS, null, row)
                     db.execSQL("UPDATE loans SET contact_id = ? WHERE id = ?", arrayOf<Any?>(contact, c.getLong(0)))
                 }
             }
+        }
+        if (oldVersion < 4) createBooks(db)
+    }
+
+    /**
+     * Version 4: books. Personal and business money kept apart; everything from before belongs to the Personal book.
+     * Entries have no book of their own: an income or expense counts in its category's book, a balance in its account's.
+     */
+    private fun createBooks(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE books (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, kind TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0)")
+        db.insert(T_BOOKS, null, values(Book(id = Books.PERSONAL_ID, name = context.getString(R.string.book_personal), kind = BookKind.PERSONAL)))
+        for (table in listOf(T_ACCOUNTS, T_CATEGORIES, T_LOANS, T_CONTACTS)) {
+            db.execSQL("ALTER TABLE $table ADD COLUMN book_id INTEGER NOT NULL DEFAULT ${Books.PERSONAL_ID}")
         }
     }
 
@@ -115,13 +134,14 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
 
     companion object {
         const val NAME = "money.db"
-        const val VERSION = 3
+        const val VERSION = 4
         const val T_ACCOUNTS = "accounts"
         const val T_CATEGORIES = "categories"
         const val T_TXNS = "txns"
         const val T_RECURRING = "recurring"
         const val T_LOANS = "loans"
         const val T_CONTACTS = "contacts"
+        const val T_BOOKS = "books"
 
         fun values(a: Account) = ContentValues().apply {
             if (a.id != 0L) put("id", a.id)
@@ -129,6 +149,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("type", a.type.name)
             put("opening", a.opening)
             put("archived", if (a.archived) 1 else 0)
+            put("book_id", a.bookId)
             put("sort", a.sort)
         }
 
@@ -140,6 +161,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("color", c.color)
             if (c.budget != null) put("budget", c.budget) else putNull("budget")
             put("archived", if (c.archived) 1 else 0)
+            put("book_id", c.bookId)
             put("sort", c.sort)
         }
 
@@ -186,6 +208,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("closed", if (l.closed) 1 else 0)
             put("created", if (l.createdAt != 0L) l.createdAt else System.currentTimeMillis())
             if (l.contactId != null) put("contact_id", l.contactId) else putNull("contact_id")
+            put("book_id", l.bookId)
         }
 
         fun loan(c: Cursor) = Loan(
@@ -202,6 +225,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             closed = c.int("closed") != 0,
             createdAt = c.long("created"),
             contactId = c.longOrNull("contact_id"),
+            bookId = c.long("book_id"),
         )
 
         fun values(c: Contact) = ContentValues().apply {
@@ -218,6 +242,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("upi", c.upi)
             put("reference", c.reference)
             put("note", c.note)
+            put("book_id", c.bookId)
         }
 
         fun contact(c: Cursor) = Contact(
@@ -234,6 +259,21 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             upi = c.str("upi"),
             reference = c.str("reference"),
             note = c.str("note"),
+            bookId = c.long("book_id"),
+        )
+
+        fun values(b: Book) = ContentValues().apply {
+            if (b.id != 0L) put("id", b.id)
+            put("name", b.name)
+            put("kind", b.kind.name)
+            put("sort", b.sort)
+        }
+
+        fun book(c: Cursor) = Book(
+            id = c.long("id"),
+            name = c.str("name"),
+            kind = if (c.str("kind") == BookKind.BUSINESS.name) BookKind.BUSINESS else BookKind.PERSONAL,
+            sort = c.int("sort"),
         )
 
         private fun Cursor.long(name: String) = getLong(getColumnIndexOrThrow(name))
@@ -248,6 +288,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             opening = c.long("opening"),
             archived = c.int("archived") != 0,
             sort = c.int("sort"),
+            bookId = c.long("book_id"),
         )
 
         fun category(c: Cursor) = Category(
@@ -259,6 +300,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             budget = c.longOrNull("budget"),
             archived = c.int("archived") != 0,
             sort = c.int("sort"),
+            bookId = c.long("book_id"),
         )
 
         fun txn(c: Cursor) = Txn(

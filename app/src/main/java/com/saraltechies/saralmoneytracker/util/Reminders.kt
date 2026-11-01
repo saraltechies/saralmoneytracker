@@ -122,7 +122,7 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val prefs = app.settings.current()
                 if (prefs.reminderOn && !app.repository.hasTxnOn(LocalDate.now())) Reminders.show(context)
-                if (prefs.reminderOn) Reminders.showLoansDue(context, app.repository.loanItems(), prefs.currency)
+                if (prefs.reminderOn) Reminders.showLoansDue(context, app.repository.loanItems(book = com.saraltechies.saralmoneytracker.model.Books.ALL), prefs.currency)
             } finally {
                 pending.finish()
             }

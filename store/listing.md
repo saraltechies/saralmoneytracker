@@ -61,7 +61,6 @@ PRIVATE AND SECURE
 • No ads, no sign-up, no tracking
 • App lock with your fingerprint, face or phone PIN
 • Hide the app's content in recent apps
-• Free and open source under the GPL-3.0 licence: github.com/saraltechies/saralmoneytracker
 
 ALSO
 • 29 currencies, with Indian number format for rupees (₹1,25,000)

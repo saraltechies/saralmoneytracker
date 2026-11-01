@@ -104,7 +104,7 @@ https://saraltechies.com/saralmoneytracker/privacy-policy (upload `store/privacy
 | --- | --- | --- |
 | App icon | icon-512.png | 512×512 PNG |
 | Feature graphic | feature-graphic-1024x500.png | 1024×500 PNG |
-| Phone screenshots | phone-screenshot-1…5.png | 1080×1920 PNG (2–8 required) |
+| Phone screenshots | phone-screenshot-1…7.png | 1080×1920 PNG (2–8 required) |
 
 All graphics are rendered from `graphics-src/store.html` with `sh graphics-src/render.sh` (run from this folder).
-The 1.0.0 screenshots are drawings of the app's screens. When convenient, replace them with real captures from a phone.
+The phone screenshots are real captures, made by the "Store screenshots" workflow (an emulator with an invented shop; no real data). Run it again after a screen changes.

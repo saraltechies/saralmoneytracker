@@ -20,7 +20,6 @@ ADD AN ENTRY IN SECONDS
 DAILY, WEEKLY, MONTHLY AND YEARLY VIEWS
 • Switch between day, week, month, year or any date range
 • Months can follow your salary cycle, for example 25th to 24th
-• Home shows this month's spending, income and savings, plus today's and this week's spending
 
 BUDGETS THAT KEEP YOU ON TRACK
 • A monthly limit for each category
@@ -30,7 +29,6 @@ BUDGETS THAT KEEP YOU ON TRACK
 CHARTS AND INSIGHTS
 • Donut chart by category and a trend chart over the period
 • Average per day, comparison with the previous period and your savings rate
-• Tap a category to see all its entries
 
 ACCOUNTS AND CREDIT CARDS, DONE RIGHT
 • Cash, bank accounts, credit cards and UPI wallets with live balances
@@ -42,8 +40,6 @@ LENT AND BORROWED MONEY
 • Interest per month (like 2% a month) or per year, on what is still owed
 • Paid back any time, or as a monthly EMI with the full plan worked out
 • See who owes what, interest due, the next payment and anything overdue
-• Payments are split into interest and principal for you
-• Only interest counts as income or spending; your balances stay right
 • Full details for each person, bank or vendor: phone, email, address, PAN/GSTIN, bank and UPI
 • Send a PDF loan statement with the running balance, EMI plan and a UPI scan-to-pay code
 • A reminder on the day a payment is due
@@ -68,14 +64,12 @@ REPEATING ENTRIES
 BRING YOUR EXCEL SHEET
 • Import your old expense tracker, including monthly "Money Out / Money In" sheets
 • Also reads any table with Date and Amount columns, and bank statements with Debit and Credit columns
-• Copied rows are skipped, and importing the same file twice is safe
 • Export everything to Excel (a full backup you can import again) or CSV
 
 PRIVATE AND SECURE
 • No internet permission: your data can't leave your phone
 • No ads, no sign-up, no tracking
 • App lock with your fingerprint, face or phone PIN
-• Hide the app's content in recent apps
 
 ALSO
 • 29 currencies, with Indian number format for rupees (₹1,25,000)

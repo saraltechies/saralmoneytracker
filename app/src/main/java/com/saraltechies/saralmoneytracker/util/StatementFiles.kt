@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.LoanItem
+import com.saraltechies.saralmoneytracker.data.PersonLoans
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.CurrencyInfo
 import com.saraltechies.saralmoneytracker.model.LoanDirection
@@ -55,6 +56,37 @@ object StatementFiles {
             .putExtra(Intent.EXTRA_TEXT, body)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         item.contact?.email?.takeIf { it.isNotBlank() }?.let { send.putExtra(Intent.EXTRA_EMAIL, arrayOf(it)) }
+        send.clipData = ClipData.newRawUri(file.name, uri)
+        return Intent.createChooser(send, context.getString(R.string.statement_share_title)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    fun accountFileName(context: Context, person: PersonLoans, today: LocalDate = LocalDate.now()): String {
+        val safe = person.name.replace(Regex("[^\\p{L}\\p{N} ._-]"), "").trim().ifEmpty { "account" }
+        return context.getString(R.string.pdf_account_file_name, safe, today.toString()) + ".pdf"
+    }
+
+    /** One person's account statement (all their loans) in the cache, ready to share. */
+    fun createAccount(context: Context, person: PersonLoans, me: Contact?, currency: CurrencyInfo): File {
+        val dir = File(context.cacheDir, DIR).apply { mkdirs() }
+        val file = File(dir, accountFileName(context, person))
+        file.outputStream().use { StatementPdf(context, currency).writeAccount(person, me, it) }
+        return file
+    }
+
+    fun shareAccountIntent(context: Context, file: File, person: PersonLoans, me: Contact?, currency: CurrencyInfo, today: LocalDate = LocalDate.now()): Intent {
+        val uri = uri(context, file)
+        val net = person.toReceive - person.toPay
+        val body = context.getString(
+            if (net >= 0) R.string.statement_email_body_lent else R.string.statement_email_body_borrowed,
+            person.name, Dates.medium(today), Money.format(kotlin.math.abs(net), currency), me?.name?.takeIf { it.isNotBlank() } ?: "",
+        ).trimEnd()
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("application/pdf")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.statement_account_subject, person.name, Dates.medium(today)))
+            .putExtra(Intent.EXTRA_TEXT, body)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        person.contact?.email?.takeIf { it.isNotBlank() }?.let { send.putExtra(Intent.EXTRA_EMAIL, arrayOf(it)) }
         send.clipData = ClipData.newRawUri(file.name, uri)
         return Intent.createChooser(send, context.getString(R.string.statement_share_title)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }

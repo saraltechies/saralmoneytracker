@@ -7,6 +7,7 @@ import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.PartyRole
+import com.saraltechies.saralmoneytracker.model.Pledge
 import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.TxnType
@@ -45,6 +46,7 @@ data class ImportedLoan(
     /** The contact's name in the Contacts sheet. */
     val contact: String? = null,
     val book: String? = null,
+    val pledge: Pledge? = null,
 )
 
 data class ImportedParty(val name: String, val role: PartyRole, val contact: String?, val book: String?, val creditDays: Int = 0)
@@ -209,6 +211,16 @@ object SpreadsheetImport {
                     closed = text(s, r, h["closed"]).equals("yes", true),
                     contact = text(s, r, h["contact"]).ifEmpty { null },
                     book = text(s, r, h["book"]).ifEmpty { null },
+                    pledge = BackupFormat.parsePledgeKind(text(s, r, h["pledge"]))?.let { kind ->
+                        Pledge(
+                            kind = kind,
+                            items = text(s, r, h["pledged items"]),
+                            weightMg = Pledge.parseGrams(text(s, r, h["weight g"])) ?: 0,
+                            purity = text(s, r, h["purity"]),
+                            value = amount(s.cell(r, h["pledge value"] ?: -1))?.absoluteValue ?: 0,
+                            returnedOn = date(s.cell(r, h["returned on"] ?: -1)),
+                        )
+                    },
                 )
             }
         }.orEmpty()

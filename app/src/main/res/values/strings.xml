@@ -905,4 +905,71 @@
         <item>Gifts Received</item>
         <item>Other Income</item>
     </string-array>
+
+    <!-- Loans against gold, silver or other items (girvi), and each person's account -->
+    <string name="loan_pledge">Security (girvi)</string>
+    <string name="loan_pledge_none">None</string>
+    <string name="loan_pledge_hint_lent">Gold, silver or other items the person left with you. Each loan keeps its own items and rate, so the same person can pledge again at a different rate as a new loan.</string>
+    <string name="loan_pledge_hint_borrowed">Gold, silver or other items you left with the lender, such as a gold loan from a bank or jeweller.</string>
+    <string name="pledge_gold">Gold</string>
+    <string name="pledge_silver">Silver</string>
+    <string name="pledge_other">Other</string>
+    <string name="pledge_items">Items</string>
+    <string name="pledge_items_hint">e.g. 1 chain, 2 bangles</string>
+    <string name="pledge_weight">Weight</string>
+    <string name="pledge_purity">Purity</string>
+    <string name="pledge_purity_hint">22K, 916</string>
+    <string name="pledge_value">Valued at</string>
+    <string name="pledge_grams">%1$s g</string>
+    <string name="pledge_ltv">The loan is %1$s%% of the value</string>
+    <string name="pledge_returned_on">Returned on %1$s</string>
+    <string name="pledge_with_you">With you</string>
+    <string name="pledge_with_lender">With the lender</string>
+    <string name="pledge_total_gold">Gold %1$s g</string>
+    <string name="pledge_total_silver">Silver %1$s g</string>
+    <plurals name="pledge_total_other">
+        <item quantity="one">%d other item</item>
+        <item quantity="other">%d other items</item>
+    </plurals>
+    <plurals name="pledge_total_items">
+        <item quantity="one">%d pledge</item>
+        <item quantity="other">%d pledges</item>
+    </plurals>
+    <string name="pledge_held_lent">Kept with you</string>
+    <string name="pledge_held_borrowed">Pledged by you</string>
+    <string name="pledge_title_lent">Kept with you as security</string>
+    <string name="pledge_title_borrowed">Pledged by you as security</string>
+    <string name="pledge_mark_returned">Items given back</string>
+    <string name="pledge_mark_held">Items not given back yet</string>
+    <string name="pledge_settled_text_lent">All paid back. Give back the items and close this loan.</string>
+    <string name="pledge_settled_text_borrowed">All paid back. Collect your items and close this loan.</string>
+    <string name="pledge_return_close">Items back, close</string>
+    <string name="error_weight">Enter the weight in grams, like 10.5</string>
+    <string name="person_add_loan">Add another loan</string>
+    <string name="person_account_hint">Each loan keeps its own date, rate and items. Tap one to record a payment.</string>
+    <string name="person_open_loans">Open loans</string>
+    <plurals name="person_loans_count">
+        <item quantity="one">%d loan</item>
+        <item quantity="other">%d loans</item>
+    </plurals>
+    <string name="person_open_count">%1$d open</string>
+    <string name="person_loan_lent">Gave %1$s on %2$s</string>
+    <string name="person_loan_borrowed">Took %1$s on %2$s</string>
+    <string name="person_statement">Account statement</string>
+    <string name="person_net_receive">Net to receive</string>
+    <string name="person_net_pay">Net to pay</string>
+    <string name="pdf_security">Security</string>
+    <string name="pdf_account_title">Account statement</string>
+    <string name="pdf_as_on">As on %1$s</string>
+    <string name="pdf_account_of">Account of</string>
+    <string name="pdf_loans">Loans</string>
+    <string name="pdf_col_loan">Loan</string>
+    <string name="pdf_col_outstanding">Outstanding</string>
+    <string name="pdf_total">Total</string>
+    <string name="pdf_net_note">To receive %1$s and to pay %2$s: the total is the difference.</string>
+    <string name="pdf_pledged_items">Items kept as security</string>
+    <string name="pdf_account_file_name">%1$s account %2$s</string>
+    <string name="statement_account_subject">Account statement: %1$s (as on %2$s)</string>
+    <string name="whatsnew_girvi_title">Gold and silver loans (girvi)</string>
+    <string name="whatsnew_girvi_text">Note the gold, silver or other items kept against a loan. Each loan has its own rate, and one person\'s loans add up in one account with a PDF statement.</string>
 </resources>

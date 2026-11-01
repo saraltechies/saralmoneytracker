@@ -49,6 +49,7 @@ import com.saraltechies.saralmoneytracker.ui.ledger.PartyScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoanDetailScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoanEditScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoansScreen
+import com.saraltechies.saralmoneytracker.ui.loans.PersonLoansScreen
 import com.saraltechies.saralmoneytracker.ui.recurring.RecurringScreen
 import com.saraltechies.saralmoneytracker.ui.settings.SettingsScreen
 import com.saraltechies.saralmoneytracker.ui.setup.SetupScreen
@@ -83,10 +84,12 @@ private object Routes {
     fun party(id: Long) = "party/$id"
     fun partyEdit(id: Long = 0, role: PartyRole = PartyRole.CUSTOMER) = "partyEdit?id=$id&role=${role.name}"
     const val LOAN = "loan/{id}"
-    const val LOAN_EDIT = "loanEdit?id={id}&dir={dir}"
+    const val LOAN_EDIT = "loanEdit?id={id}&dir={dir}&contact={contact}"
+    const val LOAN_PERSON = "loanPerson/{key}"
 
     fun loan(id: Long) = "loan/$id"
-    fun loanEdit(id: Long = 0, dir: LoanDirection = LoanDirection.LENT) = "loanEdit?id=$id&dir=${dir.name}"
+    fun loanEdit(id: Long = 0, dir: LoanDirection = LoanDirection.LENT, contact: Long = 0) = "loanEdit?id=$id&dir=${dir.name}&contact=$contact"
+    fun loanPerson(key: String) = "loanPerson/$key"
 
     fun edit(id: Long = 0, rule: Long = 0, type: TxnType = TxnType.EXPENSE) = "edit?id=$id&rule=$rule&type=${type.name}"
 }
@@ -369,6 +372,17 @@ fun AppNav(
                     onBack = { nav.popBackStack() },
                     onOpen = { nav.navigate(Routes.loan(it)) },
                     onAdd = { nav.navigate(Routes.loanEdit(dir = it)) },
+                    onOpenPerson = { nav.navigate(Routes.loanPerson(it)) },
+                )
+            }
+            composable(Routes.LOAN_PERSON, arguments = listOf(navArgument("key") { type = NavType.StringType })) { entry ->
+                PersonLoansScreen(
+                    repository = repository,
+                    personKey = entry.arguments?.getString("key").orEmpty(),
+                    onBack = { nav.popBackStack() },
+                    onOpenLoan = { nav.navigate(Routes.loan(it)) },
+                    onAddLoan = { dir, contact -> nav.navigate(Routes.loanEdit(dir = dir, contact = contact)) },
+                    onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
                 )
             }
             composable(Routes.LOAN, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
@@ -387,6 +401,7 @@ fun AppNav(
                 arguments = listOf(
                     navArgument("id") { type = NavType.LongType; defaultValue = 0L },
                     navArgument("dir") { type = NavType.StringType; defaultValue = LoanDirection.LENT.name },
+                    navArgument("contact") { type = NavType.LongType; defaultValue = 0L },
                 ),
             ) { entry ->
                 val args = entry.arguments
@@ -395,6 +410,7 @@ fun AppNav(
                     settings = settings,
                     loanId = args?.getLong("id") ?: 0L,
                     initialDirection = LoanDirection.entries.firstOrNull { it.name == args?.getString("dir") } ?: LoanDirection.LENT,
+                    initialContactId = args?.getLong("contact") ?: 0L,
                     onBack = { nav.popBackStack() },
                     // A new loan opens on its own screen, so the next step (a payment, the plan) is right there.
                     onSaved = { id ->

@@ -2,6 +2,8 @@ package com.saraltechies.saralmoneytracker.ui.loans
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,6 +61,8 @@ import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.RateUnit
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.ui.components.BookChips
@@ -78,7 +82,7 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 /** Add a loan (money given or taken), or change its terms ([loanId] != 0). */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun LoanEditScreen(
     repository: MoneyRepository,
@@ -87,6 +91,8 @@ fun LoanEditScreen(
     initialDirection: LoanDirection,
     onBack: () -> Unit,
     onSaved: (Long) -> Unit,
+    /** For a new loan with someone who already has one: their saved contact, filled in. */
+    initialContactId: Long = 0,
 ) {
     val scope = rememberCoroutineScope()
     val accounts by remember { repository.watch { repository.accounts(book = Books.ALL) } }.collectAsStateWithLifecycle(emptyList())
@@ -110,6 +116,13 @@ fun LoanEditScreen(
     var installmentText by rememberSaveable { mutableStateOf("") }
     var installmentEdited by rememberSaveable { mutableStateOf(false) }
     var note by rememberSaveable { mutableStateOf("") }
+    // Security (girvi): null kind means none.
+    var pledgeKind by rememberSaveable { mutableStateOf<PledgeKind?>(null) }
+    var pledgeItems by rememberSaveable { mutableStateOf("") }
+    var pledgeWeight by rememberSaveable { mutableStateOf("") }
+    var pledgePurity by rememberSaveable { mutableStateOf("") }
+    var pledgeValue by rememberSaveable { mutableStateOf("") }
+    var prefilled by rememberSaveable { mutableStateOf(initialContactId == 0L) }
     var error by remember { mutableStateOf<Int?>(null) }
     var pickDate by remember { mutableStateOf(false) }
     var pickAccount by remember { mutableStateOf(false) }
@@ -134,7 +147,19 @@ fun LoanEditScreen(
         installmentText = if (l.installment > 0) Money.plain(l.installment) else ""
         installmentEdited = l.installment > 0
         note = l.note
+        l.pledge?.let { p ->
+            pledgeKind = p.kind
+            pledgeItems = p.items
+            pledgeWeight = if (p.weightMg > 0) Pledge.grams(p.weightMg) else ""
+            pledgePurity = p.purity
+            pledgeValue = if (p.value > 0) Money.plain(p.value) else ""
+        }
         loaded = true
+    }
+    LaunchedEffect(savedContacts) {
+        if (prefilled || savedContacts.isEmpty()) return@LaunchedEffect
+        savedContacts.firstOrNull { it.id == initialContactId }?.let { contact = it }
+        prefilled = true
     }
     LaunchedEffect(accounts) {
         if (accountId == 0L && accounts.isNotEmpty()) accountId = (accounts.firstOrNull { it.bookId == bookId } ?: accounts.first()).id
@@ -146,6 +171,8 @@ fun LoanEditScreen(
     val computedInstallment = if (principal != null && months > 0) LoanMath.emi(principal, LoanMath.monthlyRate(rate, rateUnit), months) else 0L
     val installment = if (installmentEdited) Money.parse(installmentText) ?: 0 else computedInstallment
     val lent = direction == LoanDirection.LENT
+    val weightMg = Pledge.parseGrams(pledgeWeight)
+    val pledgeWorth = Money.parse(pledgeValue) ?: 0
 
     fun save() {
         error = when {
@@ -156,14 +183,23 @@ fun LoanEditScreen(
             withInterest && (rate <= 0 || rate > 10_000) -> R.string.error_rate
             monthly && (months !in 1..600) -> R.string.error_months
             monthly && installment <= 0 -> R.string.error_installment
+            pledgeKind != null && weightMg == null -> R.string.error_weight
             isNew && accountId == 0L -> R.string.error_account
             else -> null
         }
         if (error != null || principal == null) return
+        val pledge = pledgeKind?.let { kind ->
+            Pledge(
+                kind = kind, items = pledgeItems, weightMg = weightMg ?: 0, purity = pledgePurity, value = pledgeWorth,
+                // Changing the terms keeps whether the items were given back.
+                returnedOn = existing?.loan?.pledge?.returnedOn,
+            )
+        }
         val terms = LoanTerms(
             name = contact.name.trim(), direction = direction, startDate = date, rate = rate, rateUnit = rateUnit,
             plan = if (monthly) LoanPlan.MONTHLY else LoanPlan.FLEXIBLE,
             installments = if (monthly) months else 0, installment = if (monthly) installment else 0, note = note, bookId = bookId,
+            pledge = pledge,
         )
         scope.launch {
             val item = existing
@@ -241,6 +277,63 @@ fun LoanEditScreen(
                         Text(
                             stringResource(R.string.loan_not_from_accounts_hint), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 60.dp, end = 20.dp, bottom = 4.dp),
+                        )
+                    }
+                }
+
+                SectionLabel(stringResource(R.string.loan_pledge))
+                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = pledgeKind == null, onClick = { pledgeKind = null; error = null }, label = { Text(stringResource(R.string.loan_pledge_none)) })
+                    PledgeKind.entries.forEach { k ->
+                        FilterChip(selected = pledgeKind == k, onClick = { pledgeKind = k }, label = { Text(stringResource(Pledges.kindLabel(k))) })
+                    }
+                }
+                if (pledgeKind != null) {
+                    Text(
+                        stringResource(if (lent) R.string.loan_pledge_hint_lent else R.string.loan_pledge_hint_borrowed), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+                    OutlinedTextField(
+                        value = pledgeItems, onValueChange = { pledgeItems = it.take(120) },
+                        label = { Text(stringResource(R.string.pledge_items)) },
+                        placeholder = { Text(stringResource(R.string.pledge_items_hint)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = pledgeWeight, onValueChange = { pledgeWeight = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(10); error = null },
+                            label = { Text(stringResource(R.string.pledge_weight)) },
+                            suffix = { Text("g") },
+                            isError = weightMg == null,
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = pledgePurity, onValueChange = { pledgePurity = it.take(12) },
+                            label = { Text(stringResource(R.string.pledge_purity)) },
+                            placeholder = { Text(stringResource(R.string.pledge_purity_hint)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    OutlinedTextField(
+                        value = pledgeValue, onValueChange = { pledgeValue = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(15) },
+                        label = { Text(stringResource(R.string.pledge_value)) },
+                        prefix = { Text(com.saraltechies.saralmoneytracker.ui.components.LocalCurrency.current.symbol) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                    if (pledgeWorth > 0 && principal != null && principal > 0) {
+                        // How much of the items' worth was lent, as jewellers and banks check it.
+                        val ltv = java.math.BigDecimal.valueOf(principal * 100).divide(java.math.BigDecimal.valueOf(pledgeWorth), 0, java.math.RoundingMode.HALF_UP)
+                        Text(
+                            stringResource(R.string.pledge_ltv, ltv.toPlainString()), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp),
                         )
                     }
                 }

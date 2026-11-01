@@ -39,6 +39,9 @@ object LoanStatement {
             lines += context.getString(R.string.statement_rate, rate)
         }
         if (loan.plan == LoanPlan.MONTHLY) lines += context.getString(R.string.statement_installment, m(loan.installment), loan.installments)
+        loan.pledge?.let { p ->
+            lines += context.getString(R.string.pdf_security) + ": " + Pledges.summary(context, p) + " (" + Pledges.status(context, p, lent) + ")"
+        }
         lines += context.getString(R.string.statement_principal_left, m(s.principalLeft.coerceAtLeast(0)))
         if (loan.rate > 0 || s.interestPaid > 0) lines += context.getString(R.string.statement_interest_due, m(s.interestDue))
         lines += context.getString(if (lent) R.string.statement_total_to_receive else R.string.statement_total_to_pay, m(s.outstanding))

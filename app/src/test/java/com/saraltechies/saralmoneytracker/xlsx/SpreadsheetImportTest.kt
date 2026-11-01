@@ -15,6 +15,8 @@ import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.RateUnit
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
@@ -198,6 +200,30 @@ class SpreadsheetImportTest {
         assertEquals(-2_000_000L, result.accounts.single { it.name == "Meena" }.opening)
         // The interest entry names its loan, so it's linked again on import.
         assertEquals("Ravi", result.rows.single { it.type == TxnType.INCOME }.loan)
+    }
+
+    @Test
+    fun backupKeepsPledges() {
+        val accounts = listOf(Account(id = 5, name = "Sunita", type = AccountType.LOAN), Account(id = 6, name = "Sunita (2)", type = AccountType.LOAN))
+        val chain = Pledge(PledgeKind.GOLD, items = "1 chain", weightMg = 10_250, purity = "22K", value = 6_000_000)
+        val anklets = Pledge(PledgeKind.SILVER, items = "2 anklets", weightMg = 180_000, returnedOn = d("2026-02-20"))
+        val loans = listOf(
+            Loan(id = 1, accountId = 5, direction = LoanDirection.LENT, startDate = d("2026-01-05"), rate = 1200, rateUnit = RateUnit.YEAR, pledge = chain),
+            Loan(id = 2, accountId = 6, direction = LoanDirection.LENT, startDate = d("2026-02-01"), rate = 1800, rateUnit = RateUnit.YEAR, pledge = anklets),
+        )
+        val out = ByteArrayOutputStream()
+        BackupFormat.writeXlsx(BackupFormat.Data(accounts, emptyList(), emptyList(), emptyList(), loans), out, d("2026-03-01"), "1.7.0")
+        val result = SpreadsheetImport.read(XlsxReader.read(ByteArrayInputStream(out.toByteArray())))
+
+        assertEquals(listOf(chain, anklets), result.loans.map { it.pledge })
+        assertEquals(listOf(1200L, 1800L), result.loans.map { it.rate })
+    }
+
+    @Test
+    fun oldBackupsHaveNoPledge() {
+        assertEquals(null, BackupFormat.parsePledgeKind(""))
+        assertEquals(PledgeKind.GOLD, BackupFormat.parsePledgeKind(" gold "))
+        assertEquals(PledgeKind.OTHER, BackupFormat.parsePledgeKind("Watch"))
     }
 
     @Test

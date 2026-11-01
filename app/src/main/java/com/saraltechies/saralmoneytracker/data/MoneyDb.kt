@@ -19,6 +19,8 @@ import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Loan
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Party
 import com.saraltechies.saralmoneytracker.model.PartyRole
@@ -66,6 +68,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         createBooks(db)
         createParties(db)
         addDueDates(db)
+        addPledges(db)
         seed(db)
     }
 
@@ -89,6 +92,17 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         if (oldVersion < 4) createBooks(db)
         if (oldVersion < 5) createParties(db)
         if (oldVersion < 6) addDueDates(db)
+        if (oldVersion < 7) addPledges(db)
+    }
+
+    /** Version 7: gold, silver or other items kept as security for a loan (girvi). No kind means no pledge. */
+    private fun addPledges(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE loans ADD COLUMN pledge_kind TEXT")
+        db.execSQL("ALTER TABLE loans ADD COLUMN pledge_items TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE loans ADD COLUMN pledge_weight INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE loans ADD COLUMN pledge_purity TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE loans ADD COLUMN pledge_value INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE loans ADD COLUMN pledge_returned_day INTEGER")
     }
 
     /** Version 6: reminders before repeating entries are due, and credit days for customers and suppliers. */
@@ -157,7 +171,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
 
     companion object {
         const val NAME = "money.db"
-        const val VERSION = 6
+        const val VERSION = 7
         const val T_ACCOUNTS = "accounts"
         const val T_CATEGORIES = "categories"
         const val T_TXNS = "txns"
@@ -234,6 +248,13 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("created", if (l.createdAt != 0L) l.createdAt else System.currentTimeMillis())
             if (l.contactId != null) put("contact_id", l.contactId) else putNull("contact_id")
             put("book_id", l.bookId)
+            val p = l.pledge
+            if (p != null) put("pledge_kind", p.kind.name) else putNull("pledge_kind")
+            put("pledge_items", p?.items.orEmpty())
+            put("pledge_weight", p?.weightMg ?: 0)
+            put("pledge_purity", p?.purity.orEmpty())
+            put("pledge_value", p?.value ?: 0)
+            if (p?.returnedOn != null) put("pledge_returned_day", p.returnedOn.toEpochDay()) else putNull("pledge_returned_day")
         }
 
         fun loan(c: Cursor) = Loan(
@@ -251,6 +272,12 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             createdAt = c.long("created"),
             contactId = c.longOrNull("contact_id"),
             bookId = c.long("book_id"),
+            pledge = PledgeKind.entries.firstOrNull { it.name == c.str("pledge_kind") }?.let { kind ->
+                Pledge(
+                    kind = kind, items = c.str("pledge_items"), weightMg = c.long("pledge_weight"), purity = c.str("pledge_purity"),
+                    value = c.long("pledge_value"), returnedOn = c.longOrNull("pledge_returned_day")?.let(LocalDate::ofEpochDay),
+                )
+            },
         )
 
         fun values(c: Contact) = ContentValues().apply {

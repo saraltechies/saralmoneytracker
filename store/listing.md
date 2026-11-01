@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.6.0. Re-check before each release.
+Every claim below matches the code as of 1.7.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -39,30 +39,32 @@ LENT AND BORROWED MONEY
 • Interest per month (like 2% a month) or per year, on what is still owed
 • Paid back any time, or as a monthly EMI with the full plan worked out
 • See who owes what, interest due, the next payment and anything overdue
-• Full details for each person, bank or vendor: phone, email, address, PAN/GSTIN, bank and UPI
+• Phone, address, PAN/GSTIN, bank and UPI details for each person or bank
 • Send a PDF loan statement with the running balance, EMI plan and a UPI scan-to-pay code
+
+GOLD AND SILVER LOANS (GIRVI)
+• Gold, silver or other items kept against a loan, with weight, purity and value
+• The same person can pledge again at another rate: each loan keeps its own rate and items
+• One account per person: all loans, interest due, gold held and a PDF statement
 
 PERSONAL AND BUSINESS, KEPT APART
 • Run a shop or a business? Keep its money in its own book, apart from yours
 • Each book has its own accounts, categories, budgets and loans; switch in one tap
-• A business bill paid from your personal account still counts as a business expense
 • Money you put in or take out is capital or drawings, never income or spending
-• Profit and loss report as a PDF, by month or financial year, for you, your accountant or bank
+• Profit and loss report as a PDF, by month or financial year
 
 CREDIT LEDGER FOR CUSTOMERS AND SUPPLIERS
 • Record what you gave and got on credit in two taps, with a running balance for each person
 • Send a payment reminder on WhatsApp or SMS, with your UPI ID
 • PDF account statement with a UPI scan-to-pay code
 • Credit period for each customer: see what is overdue and since when
-• Repeat an entry weekly or monthly, like rent from a tenant
 
 CASH FLOW AHEAD
 • Your expected balance at month end, or in 30 or 90 days
 • From repeating bills, EMIs and customer dues; warns if money will run short
 
 REPEATING ENTRIES
-• Add salary, rent, EMIs, SIPs and subscriptions once
-• They're recorded on their dates by themselves: daily, weekly, monthly or yearly
+• Salary, rent, EMIs, SIPs and subscriptions are added on their dates by themselves
 
 BRING YOUR EXCEL SHEET
 • Import your old expense tracker, including monthly "Money Out / Money In" sheets

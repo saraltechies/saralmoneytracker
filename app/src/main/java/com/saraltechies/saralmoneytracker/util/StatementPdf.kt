@@ -14,6 +14,9 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.LoanItem
+import com.saraltechies.saralmoneytracker.data.PersonLoans
+import com.saraltechies.saralmoneytracker.model.Pledge
+import com.saraltechies.saralmoneytracker.ui.loans.Pledges
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.CurrencyInfo
@@ -77,13 +80,38 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         footer = s(R.string.pdf_footer, Dates.medium(today))
         try {
             newPage()
-            header(me, data, today)
+            header(me, s(R.string.pdf_title), s(R.string.pdf_period, Dates.medium(data.from), Dates.medium(data.to)), today)
             parties(item, me)
             summary(item, data)
             entries(item, data)
             if (options.includePlan && item.loan.plan == LoanPlan.MONTHLY && item.loan.installments > 0) plan(item, today)
             if (item.loan.direction == LoanDirection.LENT && me != null && (me.hasBankDetails)) payment(item, me, data, options.includeQr)
-            closingNote(item, me)
+            closingNote(me)
+            finishPage()
+            doc.writeTo(out)
+        } finally {
+            doc.close()
+        }
+    }
+
+    /**
+     * One person's whole account: every loan with its own date, rate and pledge, what's left on each and in all,
+     * and the gold, silver and other items held, so both sides can check it against their own records.
+     */
+    fun writeAccount(person: PersonLoans, me: Contact?, out: OutputStream, today: LocalDate = LocalDate.now()) {
+        doc = PdfDocument()
+        pageNumber = 0
+        footer = s(R.string.pdf_footer, Dates.medium(today))
+        try {
+            newPage()
+            header(me, s(R.string.pdf_account_title), s(R.string.pdf_as_on, Dates.medium(today)), today)
+            accountParty(person)
+            accountSummary(person)
+            accountLoans(person)
+            accountPledges(person)
+            val toReceive = person.toReceive - person.toPay
+            if (toReceive > 0 && me != null && me.hasBankDetails) accountPayment(person, me, toReceive)
+            closingNote(me)
             finishPage()
             doc.writeTo(out)
         } finally {
@@ -119,7 +147,7 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
 
     // ---- Sections ---------------------------------------------------------------------------------------------
 
-    private fun header(me: Contact?, data: StatementData, today: LocalDate) {
+    private fun header(me: Contact?, title: String, subtitle: String, today: LocalDate) {
         val top = y
         // Left: who is sending it.
         var ly = top + 14f
@@ -135,8 +163,8 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         }
         // Right: what it is.
         val right = pageWidth - margin
-        canvas.drawText(s(R.string.pdf_title).uppercase(), right, top + 14f, paint(14f, brand, bold = true, align = Paint.Align.RIGHT))
-        canvas.drawText(s(R.string.pdf_period, Dates.medium(data.from), Dates.medium(data.to)), right, top + 29f, paint(8.5f, slate, align = Paint.Align.RIGHT))
+        canvas.drawText(title.uppercase(), right, top + 14f, paint(14f, brand, bold = true, align = Paint.Align.RIGHT))
+        canvas.drawText(subtitle, right, top + 29f, paint(8.5f, slate, align = Paint.Align.RIGHT))
         canvas.drawText(s(R.string.pdf_date, Dates.medium(today)), right, top + 41f, paint(8.5f, slate, align = Paint.Align.RIGHT))
         y = maxOf(ly, top + 41f) + 12f
         canvas.drawRect(margin, y, pageWidth - margin, y + 2f, Paint().apply { color = brand })
@@ -160,6 +188,12 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         right += s(R.string.pdf_interest) to if (loan.rate > 0) rate(loan.rate, loan.rateUnit) else s(R.string.loan_no_interest)
         right += s(R.string.pdf_repayment) to if (loan.plan == LoanPlan.MONTHLY) s(R.string.pdf_emi_plan, m(loan.installment), loan.installments) else s(R.string.loan_any_time)
         if (contact.reference.isNotBlank()) right += s(R.string.pdf_reference) to contact.reference
+        loan.pledge?.let { p ->
+            right += s(R.string.pdf_security) to Pledges.summary(context, p, withItems = false)
+            if (p.items.isNotBlank()) right += s(R.string.pledge_items) to p.items
+            if (p.value > 0) right += s(R.string.pledge_value) to m(p.value)
+            right += s(R.string.pdf_col_status) to Pledges.status(context, p, lent)
+        }
 
         val leftHeight = 18f + left.sumOf { (t, _) -> wrap(t, paint(9f), half - 20f).size } * 12f
         val rightHeight = 18f + right.size * 13f
@@ -324,7 +358,162 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         y += h + 14f
     }
 
-    private fun closingNote(item: LoanItem, me: Contact?) {
+    // ---- Account of one person --------------------------------------------------------------------------------
+
+    private fun accountParty(person: PersonLoans) {
+        val contact = person.contact ?: Contact(name = person.name)
+        val lines = mutableListOf(contact.name to true)
+        if (contact.kind != ContactKind.PERSON) lines += s(kindLabel(contact.kind)) to false
+        detailLines(contact, withBank = person.toPay > 0).forEach { lines += it to false }
+        val h = 22f + lines.sumOf { (t, _) -> wrap(t, paint(9f), contentWidth - 20f).size } * 12f
+        ensure(h + 10f)
+        box(margin, y, contentWidth, h)
+        label(s(R.string.pdf_account_of), margin + 10f, y + 14f)
+        var ly = y + 16f
+        for ((text, bold) in lines) {
+            for (w in wrap(text, paint(9f), contentWidth - 20f)) {
+                ly += 12f
+                canvas.drawText(w, margin + 10f, ly, paint(if (bold) 10f else 8.5f, if (bold) ink else slate, bold = bold))
+            }
+        }
+        y += h + 14f
+    }
+
+    private fun accountSummary(person: PersonLoans) {
+        val cells = mutableListOf(
+            s(R.string.person_open_loans) to person.openCount.toString(),
+            s(R.string.loan_principal_left) to m(person.principalLeft),
+            s(R.string.loan_interest_due) to m(person.interestDue),
+        )
+        if (person.monthlyInterest > 0) cells += s(R.string.loan_interest_per_month) to m(person.monthlyInterest)
+        val held = person.heldByYou
+        if (!held.isEmpty) cells += s(R.string.pledge_held_lent) to Pledges.totals(context, held)
+        val pledged = person.pledgedByYou
+        if (!pledged.isEmpty) cells += s(R.string.pledge_held_borrowed) to Pledges.totals(context, pledged)
+        val rows = (cells.size + 2) / 3
+        val h = 22f + rows * 30f + 18f
+        ensure(h + 10f)
+        canvas.drawRoundRect(RectF(margin, y, pageWidth - margin, y + h), 6f, 6f, Paint().apply { color = mist })
+        val colW = contentWidth / 3
+        cells.forEachIndexed { i, (k, v) ->
+            val cx = margin + 12f + (i % 3) * colW
+            val cy = y + 18f + (i / 3) * 30f
+            canvas.drawText(clip(k, paint(8f, slate), colW - 16f), cx, cy, paint(8f, slate))
+            canvas.drawText(clip(v, paint(10f, ink, bold = true), colW - 16f), cx, cy + 12f, paint(10f, ink, bold = true))
+        }
+        val by = y + h - 14f
+        val net = person.toReceive - person.toPay
+        canvas.drawText(
+            s(if (net >= 0) R.string.statement_total_to_receive_label else R.string.statement_total_to_pay_label),
+            margin + 12f, by, paint(10f, navy, bold = true),
+        )
+        canvas.drawText(m(kotlin.math.abs(net)), pageWidth - margin - 12f, by, paint(13f, if (net >= 0) green else red, bold = true, align = Paint.Align.RIGHT))
+        y += h + 16f
+    }
+
+    private val loanCols = floatArrayOf(62f, 151f, 62f, 72f, 62f, 106f)
+
+    private fun accountLoans(person: PersonLoans) {
+        val header = listOf(
+            s(R.string.pdf_col_date), s(R.string.pdf_col_loan), s(R.string.pdf_interest),
+            s(R.string.loan_principal_left), s(R.string.loan_interest_due), s(R.string.pdf_col_outstanding),
+        )
+        ensure(70f)
+        sectionTitle(s(R.string.pdf_loans))
+        tableHeader(header, loanCols, rightAlignedFrom = 3)
+        val sorted = person.loans.sortedWith(compareBy({ it.loan.closed }, { it.loan.startDate }))
+        sorted.forEachIndexed { i, item ->
+            if (y + 16f > bottomLimit) {
+                newPage()
+                tableHeader(header, loanCols, rightAlignedFrom = 3)
+            }
+            val loan = item.loan
+            val lent = loan.direction == LoanDirection.LENT
+            val what = listOfNotNull(
+                s(if (lent) R.string.pdf_money_lent else R.string.pdf_money_borrowed) + " " + m(item.summary.given),
+                loan.pledge?.let { Pledges.summary(context, it, withItems = false) },
+            ).joinToString(" · ")
+            val outstanding = when {
+                loan.closed -> s(R.string.loan_closed)
+                else -> m(item.summary.outstanding)
+            }
+            row(
+                listOf(
+                    Dates.medium(loan.startDate), what, if (loan.rate > 0) rate(loan.rate, loan.rateUnit) else s(R.string.loan_no_interest),
+                    m(item.summary.principalLeft.coerceAtLeast(0)), m(item.summary.interestDue), outstanding,
+                ),
+                loanCols, shaded = i % 2 == 1, lastColor = if (loan.closed) slate else if (lent) green else red, rightFrom = 3,
+            )
+        }
+        if (y + 16f > bottomLimit) newPage()
+        val open = person.loans.filter { !it.loan.closed }
+        val net = person.toReceive - person.toPay
+        row(
+            listOf("", s(R.string.pdf_total), "", m(person.principalLeft), m(person.interestDue), m(kotlin.math.abs(net))),
+            loanCols, bold = true, rightFrom = 3,
+        )
+        if (open.any { it.loan.direction == LoanDirection.LENT } && open.any { it.loan.direction == LoanDirection.BORROWED }) {
+            y += 4f
+            canvas.drawText(s(R.string.pdf_net_note, m(person.toReceive), m(person.toPay)), margin, y + 10f, paint(8.5f, slate))
+            y += 14f
+        }
+        y += 14f
+    }
+
+    private val pledgeCols = floatArrayOf(62f, 70f, 155f, 52f, 72f, 104f)
+
+    private fun accountPledges(person: PersonLoans) {
+        val withPledge = person.loans.filter { it.loan.pledge != null }.sortedBy { it.loan.startDate }
+        if (withPledge.isEmpty()) return
+        val header = listOf(
+            s(R.string.pdf_col_date), s(R.string.pdf_security), s(R.string.pledge_items), s(R.string.pledge_weight),
+            s(R.string.pledge_value), s(R.string.pdf_col_status),
+        )
+        ensure(70f)
+        sectionTitle(s(R.string.pdf_pledged_items))
+        tableHeader(header, pledgeCols, rightAlignedFrom = 3)
+        withPledge.forEachIndexed { i, item ->
+            if (y + 16f > bottomLimit) {
+                newPage()
+                tableHeader(header, pledgeCols, rightAlignedFrom = 3)
+            }
+            val p = item.loan.pledge ?: return@forEachIndexed
+            val lent = item.loan.direction == LoanDirection.LENT
+            row(
+                listOf(
+                    Dates.medium(item.loan.startDate), Pledges.kindAndPurity(context, p), p.items.ifBlank { "-" },
+                    if (p.weightMg > 0) s(R.string.pledge_grams, Pledge.grams(p.weightMg)) else "-",
+                    if (p.value > 0) m(p.value) else "-", Pledges.status(context, p, lent),
+                ),
+                pledgeCols, shaded = i % 2 == 1, lastColor = if (p.returned) slate else brand, rightFrom = 3,
+            )
+        }
+        y += 14f
+    }
+
+    private fun accountPayment(person: PersonLoans, me: Contact, due: Long) {
+        val lines = mutableListOf<Pair<String, String>>()
+        if (me.bankName.isNotBlank()) lines += s(R.string.contact_bank) to me.bankName
+        if (me.bankAccount.isNotBlank()) lines += s(R.string.contact_bank_account) to me.bankAccount
+        if (me.ifsc.isNotBlank()) lines += s(R.string.contact_ifsc) to me.ifsc
+        if (me.upi.isNotBlank()) lines += s(R.string.contact_upi) to me.upi
+        val h = 26f + lines.size * 14f + 8f
+        ensure(h + 20f)
+        sectionTitle(s(R.string.pdf_how_to_pay))
+        box(margin, y, contentWidth, h)
+        var ly = y + 6f
+        canvas.drawText(s(R.string.pdf_pay_to, me.name), margin + 12f, ly + 12f, paint(9f, ink, bold = true))
+        canvas.drawText(m(due), pageWidth - margin - 12f, ly + 12f, paint(9f, green, bold = true, align = Paint.Align.RIGHT))
+        ly += 14f
+        for ((k, v) in lines) {
+            ly += 14f
+            canvas.drawText(k, margin + 12f, ly, paint(8.5f, slate))
+            canvas.drawText(v, margin + 110f, ly, paint(9f, ink, bold = true))
+        }
+        y += h + 14f
+    }
+
+    private fun closingNote(me: Contact?) {
         val text = s(R.string.pdf_closing_note, me?.name?.takeIf { it.isNotBlank() } ?: s(R.string.pdf_sender_fallback))
         val lines = wrap(text, paint(8.5f, slate), contentWidth)
         ensure(lines.size * 12f + 8f)
@@ -361,13 +550,13 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         y += 18f
     }
 
-    private fun row(cells: List<String>, cols: FloatArray, bold: Boolean = false, shaded: Boolean = false, lastColor: Int? = null) {
+    private fun row(cells: List<String>, cols: FloatArray, bold: Boolean = false, shaded: Boolean = false, lastColor: Int? = null, rightFrom: Int = 2) {
         val h = 16f
         if (shaded || bold) canvas.drawRect(margin, y, pageWidth - margin, y + h, Paint().apply { color = if (bold) Color.rgb(226, 232, 240) else mist })
         var x = margin
         cells.forEachIndexed { i, text ->
             // Dates and descriptions read left to right; amounts line up on the right.
-            val right = cols === entryCols && i >= 2 || cols === planCols && i >= 2
+            val right = i >= rightFrom
             val color = if (i == cells.lastIndex && lastColor != null) lastColor else ink
             val p = paint(8f, color, bold = bold || (i == cells.lastIndex && lastColor != null), align = if (right) Paint.Align.RIGHT else Paint.Align.LEFT)
             canvas.drawText(clip(text, p, cols[i] - 10f), if (right) x + cols[i] - 6f else x + 6f, y + 11f, p)

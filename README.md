@@ -8,7 +8,7 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=com.saraltechies.saralmoneytracker)
 -->
 
-## Features (1.6)
+## Features (1.7)
 
 - **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), your most used categories first (with **More**
   and a search for the rest), today/yesterday chips, and
@@ -31,6 +31,10 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   interest due, the EMI plan with paid and late instalments, and what is overdue; a payment is split into interest and
   principal for you. Each loan has its own account, so balances and net worth stay right and only the interest counts as
   income or spending. A reminder on the day a payment is due.
+- **Gold and silver loans (girvi)**: a loan can have gold, silver or other items kept as security, with the items, weight in
+  grams, purity and value. The same person can pledge several times, each loan at its own rate (12% a year on a chain, 18%
+  later on bangles); their account adds up every loan, the interest due and the gold and silver held, and items are marked
+  as given back when the loan is paid off. A PDF account statement lists all their loans and pledged items.
 - **Contacts and PDF statements**: each loan is with a person, bank, finance company or vendor, with phone, email, address,
   PAN/GSTIN, bank account, IFSC, UPI ID and a loan reference (name and number can be picked from the phone's contacts,
   with no contacts permission). Add **your details** once, and send a PDF statement: both parties, terms, a summary, every

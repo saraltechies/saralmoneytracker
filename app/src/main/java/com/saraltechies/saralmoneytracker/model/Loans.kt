@@ -1,5 +1,7 @@
 package com.saraltechies.saralmoneytracker.model
 
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.pow
@@ -41,7 +43,63 @@ data class Loan(
     val bookId: Long = Books.PERSONAL_ID,
     /** The person, bank or vendor this loan is with, and their details. */
     val contactId: Long? = null,
+    /** Gold, silver or something else kept as security (girvi); null for a loan without one. */
+    val pledge: Pledge? = null,
 )
+
+/** What a pledge is made of. */
+enum class PledgeKind { GOLD, SILVER, OTHER }
+
+/**
+ * Something kept as security for a loan (girvi): with you when you lent the money, with the lender when you borrowed.
+ * Each loan has its own pledge, so the same person can pledge a chain at 12% a year and bangles later at 18%.
+ */
+data class Pledge(
+    val kind: PledgeKind,
+    /** What the items are: "1 chain, 2 bangles". */
+    val items: String = "",
+    /** Weight in milligrams, so 10.25 g is 10250. Zero when not known. */
+    val weightMg: Long = 0,
+    /** Purity as people say it: "22K", "916", "92.5". */
+    val purity: String = "",
+    /** What the items were valued at, in hundredths. Zero when not known. */
+    val value: Long = 0,
+    /** The day the items were given back; null while they're still held. */
+    val returnedOn: LocalDate? = null,
+) {
+    val returned: Boolean get() = returnedOn != null
+
+    companion object {
+        /** "10.25" or "10,5" grams to milligrams; 0 when empty, null when it isn't a number. */
+        fun parseGrams(text: String): Long? {
+            val t = text.trim().replace(',', '.')
+            if (t.isEmpty()) return 0
+            return t.toBigDecimalOrNull()?.takeIf { it.signum() >= 0 }?.movePointRight(3)?.setScale(0, RoundingMode.HALF_UP)?.toLong()
+        }
+
+        /** Milligrams as grams without needless zeros: 10250 is "10.25", 8000 is "8". */
+        fun grams(mg: Long): String = BigDecimal.valueOf(mg, 3).stripTrailingZeros().toPlainString()
+    }
+}
+
+/** Gold, silver and other items added up, with what they were valued at. */
+data class PledgeTotals(val goldMg: Long = 0, val silverMg: Long = 0, val others: Int = 0, val value: Long = 0, val count: Int = 0) {
+    val isEmpty: Boolean get() = count == 0
+
+    operator fun plus(p: Pledge) = PledgeTotals(
+        goldMg = goldMg + if (p.kind == PledgeKind.GOLD) p.weightMg else 0,
+        silverMg = silverMg + if (p.kind == PledgeKind.SILVER) p.weightMg else 0,
+        others = others + if (p.kind == PledgeKind.OTHER) 1 else 0,
+        value = value + p.value,
+        count = count + 1,
+    )
+
+    companion object {
+        /** Pledges of [loans] still held: not given back, on loans that aren't closed. */
+        fun held(loans: List<Loan>): PledgeTotals =
+            loans.filter { !it.closed }.mapNotNull { it.pledge?.takeIf { p -> !p.returned } }.fold(PledgeTotals()) { t, p -> t + p }
+    }
+}
 
 enum class LoanEventKind {
     /** Principal added: the money given at the start, or more given later. */

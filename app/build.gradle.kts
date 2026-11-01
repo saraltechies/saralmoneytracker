@@ -22,6 +22,7 @@ android {
         targetSdk = 36
         versionCode = 3
         versionName = "1.2.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -83,4 +84,6 @@ dependencies {
     implementation(libs.play.app.update.ktx)
 
     testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }

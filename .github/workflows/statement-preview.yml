@@ -6,6 +6,8 @@ on:
   pull_request:
     paths:
       - "app/src/main/java/com/saraltechies/saralmoneytracker/util/StatementPdf.kt"
+      - "app/src/main/java/com/saraltechies/saralmoneytracker/util/ReportPdf.kt"
+      - "app/src/main/java/com/saraltechies/saralmoneytracker/data/MoneyDb.kt"
       - "app/src/androidTest/**"
       - ".github/workflows/statement-preview.yml"
   workflow_dispatch:

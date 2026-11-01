@@ -5,7 +5,16 @@ import java.time.LocalDate
 enum class TxnType { EXPENSE, INCOME, TRANSFER }
 
 /** [LOAN] accounts belong to a [Loan]: they're kept out of the account lists and shown on the Loans screen instead. */
-enum class AccountType { CASH, BANK, CARD, WALLET, OTHER, LOAN }
+enum class AccountType {
+    CASH, BANK, CARD, WALLET, OTHER, LOAN,
+
+    /** A customer's or supplier's running account in the credit ledger ([Party]). */
+    PARTY,
+    ;
+
+    /** Loan and party accounts belong to their own screens, not to account lists and pickers. */
+    val isHidden: Boolean get() = this == LOAN || this == PARTY
+}
 
 enum class Frequency { DAILY, WEEKLY, MONTHLY, YEARLY }
 

@@ -8,6 +8,8 @@ on:
       - "app/src/main/java/com/saraltechies/saralmoneytracker/util/StatementPdf.kt"
       - "app/src/main/java/com/saraltechies/saralmoneytracker/util/ReportPdf.kt"
       - "app/src/main/java/com/saraltechies/saralmoneytracker/data/MoneyDb.kt"
+      - "app/src/main/java/com/saraltechies/saralmoneytracker/util/PartyStatementPdf.kt"
+      - "app/src/main/res/layout/widget_money.xml"
       - "app/src/androidTest/**"
       - ".github/workflows/statement-preview.yml"
   workflow_dispatch:

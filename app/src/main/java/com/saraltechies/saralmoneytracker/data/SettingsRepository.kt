@@ -81,7 +81,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAppLock(on: Boolean) = context.dataStore.edit { it[appLockKey] = on }
     suspend fun setHideInRecents(on: Boolean) = context.dataStore.edit { it[hideRecentsKey] = on }
     suspend fun setWelcomeDismissed() = context.dataStore.edit { it[welcomeDismissedKey] = true }
-    suspend fun setBook(id: Long) = context.dataStore.edit { it[bookKey] = id }
+    suspend fun setBook(id: Long) {
+        context.dataStore.edit { it[bookKey] = id }
+        com.saraltechies.saralmoneytracker.util.Widgets.requestUpdate(context)
+    }
 
     suspend fun setReminder(on: Boolean, minute: Int) = context.dataStore.edit {
         it[reminderOnKey] = on

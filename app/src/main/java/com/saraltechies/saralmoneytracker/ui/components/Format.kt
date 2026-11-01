@@ -90,6 +90,7 @@ fun accountTypeLabel(type: AccountType): Int = when (type) {
     AccountType.WALLET -> R.string.account_type_wallet
     AccountType.OTHER -> R.string.account_type_other
     AccountType.LOAN -> R.string.account_type_loan
+    AccountType.PARTY -> R.string.account_type_party
 }
 
 fun frequencyLabel(f: Frequency): Int = when (f) {

@@ -21,6 +21,10 @@ data class BookReport(
     val balances: List<Pair<Account, Long>>,
     val loansToReceive: Long,
     val loansToPay: Long,
+    /** Customers' credit balances still to collect (from the credit ledger). */
+    val customersOwe: Long = 0,
+    /** What you owe suppliers on credit. */
+    val oweSuppliers: Long = 0,
 ) {
     val totalIncome: Long get() = income.sumOf { it.amount }
     val totalExpenses: Long get() = expenses.sumOf { it.amount }
@@ -70,8 +74,9 @@ object Reports {
             }
         }
 
-        val bookAccounts = accounts.filter { (book == null || it.bookId == book.id) && it.type != AccountType.LOAN }
-        val balances = Stats.balances(bookAccounts, txns.filter { !it.date.isAfter(to) })
+        val bookAccounts = accounts.filter { (book == null || it.bookId == book.id) && !it.type.isHidden }
+        val parties = accounts.filter { (book == null || it.bookId == book.id) && it.type == AccountType.PARTY }
+        val balances = Stats.balances(bookAccounts + parties, txns.filter { !it.date.isAfter(to) })
         val shown = bookAccounts.filter { !it.archived || (balances[it.id] ?: 0) != 0L }.map { it to (balances[it.id] ?: 0) }
 
         val open = loans.filter { !it.first.closed }
@@ -80,6 +85,8 @@ object Reports {
             fromOtherBooks = fromOthers, toOtherBooks = toOthers, balances = shown,
             loansToReceive = open.filter { it.first.direction == LoanDirection.LENT }.sumOf { it.second.outstanding },
             loansToPay = open.filter { it.first.direction == LoanDirection.BORROWED }.sumOf { it.second.outstanding },
+            customersOwe = parties.sumOf { (balances[it.id] ?: 0).coerceAtLeast(0) },
+            oweSuppliers = -parties.sumOf { (balances[it.id] ?: 0).coerceAtMost(0) },
         )
     }
 }

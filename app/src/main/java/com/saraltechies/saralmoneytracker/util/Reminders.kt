@@ -139,6 +139,7 @@ class RescheduleReceiver : BroadcastReceiver() {
             try {
                 val prefs = app.settings.current()
                 Reminders.schedule(context, prefs.reminderOn, prefs.reminderMinute)
+                Widgets.refreshNow(context)
             } finally {
                 pending.finish()
             }

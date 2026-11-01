@@ -10,6 +10,8 @@ import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Loan
+import com.saraltechies.saralmoneytracker.model.Party
+import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.RateUnit
@@ -254,6 +256,30 @@ class SpreadsheetImportTest {
         // Same category name in two books: each entry keeps its own book, so neither is taken for a copy of the other.
         assertEquals(setOf("Personal", "Sharma Traders"), result.rows.map { it.book }.toSet())
         assertEquals(listOf("Sharma Traders"), result.contactBooks)
+    }
+
+    @Test
+    fun backupKeepsCreditLedger() {
+        val accounts = listOf(
+            Account(id = 1, name = "Cash", type = AccountType.CASH),
+            Account(id = 7, name = "Ramesh", type = AccountType.PARTY, opening = 50_000),
+        )
+        val contacts = listOf(Contact(id = 5, name = "Ramesh", phone = "98765 43210"))
+        val parties = listOf(Party(id = 1, accountId = 7, contactId = 5, role = PartyRole.CUSTOMER))
+        val categories = listOf(Category(id = 20, name = "Sales", kind = TxnType.INCOME, icon = "store", color = 0))
+        val txns = listOf(Txn(type = TxnType.INCOME, amount = 120_000, date = d("2026-11-02"), categoryId = 20, accountId = 7))
+        val out = ByteArrayOutputStream()
+        BackupFormat.writeXlsx(
+            BackupFormat.Data(accounts, categories, txns, emptyList(), emptyList(), contacts, emptyList(), parties), out, d("2026-11-10"), "1.4.0",
+        )
+        val result = SpreadsheetImport.read(XlsxReader.read(ByteArrayInputStream(out.toByteArray())))
+        val party = result.parties.single()
+        assertEquals("Ramesh", party.name)
+        assertEquals(PartyRole.CUSTOMER, party.role)
+        assertEquals("Ramesh", party.contact)
+        assertEquals(AccountType.PARTY, result.accounts.single { it.name == "Ramesh" }.type)
+        assertEquals(50_000L, result.accounts.single { it.name == "Ramesh" }.opening)
+        assertEquals("Ramesh", result.rows.single().account)
     }
 
     @Test

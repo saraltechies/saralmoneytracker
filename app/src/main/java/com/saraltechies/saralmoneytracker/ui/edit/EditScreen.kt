@@ -122,6 +122,7 @@ fun EditScreen(
     onDeleted: (Txn) -> Unit,
     onManageCategories: () -> Unit,
     onOpenLoan: (Long) -> Unit,
+    onOpenParty: (Long) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
@@ -163,7 +164,17 @@ fun EditScreen(
         // Categories and accounts of every book, read now: the lists on screen may not have arrived yet.
         val allCats = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.categories(true, book = Books.ALL) }
         val allAccs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.accounts(true, book = Books.ALL) }
+        val partyId = txn?.let { t ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                (repository.partyForAccount(t.accountId) ?: t.toAccountId?.let { repository.partyForAccount(it) })?.id
+            }
+        }
         when {
+            // Entries with a customer or supplier are changed on their page, where the running balance is.
+            txn != null && partyId != null -> {
+                onOpenParty(partyId)
+                return@LaunchedEffect
+            }
             // Loan entries are changed on the loan's own screen, where the interest and balance are worked out.
             txn?.loanId != null -> {
                 onOpenLoan(txn.loanId)
@@ -198,7 +209,7 @@ fun EditScreen(
                 fun inBook(t: Txn) = t.categoryId?.let { id -> allCats.firstOrNull { it.id == id }?.bookId } == bookId ||
                     (t.categoryId == null && allAccs.firstOrNull { it.id == t.accountId }?.bookId == bookId)
                 val last = own.firstOrNull { it.type == type && inBook(it) }
-                accountId = last?.accountId ?: own.firstOrNull { inBook(it) }?.accountId ?: allAccs.firstOrNull { it.bookId == bookId && !it.archived && it.type != com.saraltechies.saralmoneytracker.model.AccountType.LOAN }?.id
+                accountId = last?.accountId ?: own.firstOrNull { inBook(it) }?.accountId ?: allAccs.firstOrNull { it.bookId == bookId && !it.archived && !it.type.isHidden }?.id
                 toAccountId = last?.toAccountId
                 categoryId = last?.categoryId
                 if (isRule) repeat = Frequency.MONTHLY

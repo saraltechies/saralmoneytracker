@@ -26,6 +26,10 @@ import java.time.format.DateTimeFormatter
  * folder picker (on the phone, or a Google Drive folder, whose app then uploads it). The newest [KEEP] copies are
  * kept. The app itself needs no internet or storage permission for this.
  *
+ * The picker often can't make a new folder (Google Drive hides "New folder" on many phones), so people pick
+ * "My Drive" or the phone's main storage. Unless the picked folder is clearly meant for backups, the app makes its
+ * own [FOLDER] inside it and saves there.
+ *
  * It runs from an inexact daily alarm, and also when the app opens if a backup is overdue, since some phones hold
  * alarms back.
  */
@@ -33,6 +37,7 @@ object AutoBackup {
 
     const val KEEP = 7
     const val PREFIX = "Saral Money Tracker backup "
+    const val FOLDER = "Saral Money Tracker backups"
     private const val MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     private const val REQUEST = 20
     private val lock = Mutex()
@@ -78,43 +83,87 @@ object AutoBackup {
 
     private fun write(context: Context, tree: Uri) {
         val resolver = context.contentResolver
-        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        val dir = target(context, tree, create = true).id
+        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, dir)
         val name = PREFIX + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HHmm")) + ".xlsx"
         val doc = DocumentsContract.createDocument(resolver, parent, MIME, name) ?: error("couldn't create the file")
         val app = context.applicationContext as SaralMoneyTrackerApp
         resolver.openOutputStream(doc, "w")?.use { out ->
             BackupFormat.writeXlsx(app.repository.exportData(), out, LocalDate.now(), BuildConfig.VERSION_NAME)
         } ?: error("couldn't open the file")
-        prune(context, tree)
+        prune(context, tree, dir)
+    }
+
+    private data class Child(val id: String, val name: String, val isDir: Boolean)
+
+    /** Where the backups go: the picked folder, or the app's own [FOLDER] inside it. */
+    private data class Target(val id: String, val path: String)
+
+    private fun children(context: Context, tree: Uri, dir: String): List<Child> {
+        val uri = DocumentsContract.buildChildDocumentsUriUsingTree(tree, dir)
+        val columns = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE,
+        )
+        return context.contentResolver.query(uri, columns, null, null, null)?.use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    val name = c.getString(1) ?: continue
+                    add(Child(c.getString(0), name, c.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR))
+                }
+            }
+        }.orEmpty()
+    }
+
+    private fun displayName(context: Context, tree: Uri, id: String): String? =
+        context.contentResolver.query(
+            DocumentsContract.buildDocumentUriUsingTree(tree, id), arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null,
+        )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+
+    /** True if [name] is an automatic backup file. */
+    fun isBackupFile(name: String) = name.startsWith(PREFIX) && name.endsWith(".xlsx")
+
+    /**
+     * Whether to save straight into the picked folder: when it's already meant for backups (its name says so,
+     * it is our own [FOLDER], or our backups are already in it). Otherwise, like "My Drive" or the phone's main
+     * storage, the app keeps its files in its own folder.
+     */
+    fun usePickedFolder(name: String?, hasOurBackups: Boolean): Boolean {
+        if (hasOurBackups) return true
+        val n = name?.lowercase() ?: return false
+        return "backup" in n || "saral" in n || "money" in n
+    }
+
+    /** Finds (and with [create], makes) the folder the backups go in. Falls back to the picked folder. */
+    private fun target(context: Context, tree: Uri, create: Boolean): Target {
+        val root = DocumentsContract.getTreeDocumentId(tree)
+        val rootName = displayName(context, tree, root)
+        val inRoot = children(context, tree, root)
+        val picked = Target(root, rootName.orEmpty())
+        if (usePickedFolder(rootName, inRoot.any { !it.isDir && isBackupFile(it.name) })) return picked
+        val path = listOfNotNull(rootName, FOLDER).joinToString(" › ")
+        inRoot.firstOrNull { it.isDir && it.name == FOLDER }?.let { return Target(it.id, path) }
+        if (!create) return Target(root, path) // Made on the first backup.
+        val made = runCatching {
+            DocumentsContract.createDocument(
+                context.contentResolver, DocumentsContract.buildDocumentUriUsingTree(tree, root), DocumentsContract.Document.MIME_TYPE_DIR, FOLDER,
+            )
+        }.getOrNull() ?: return picked // This provider can't make folders: save in the picked one.
+        return Target(DocumentsContract.getDocumentId(made), path)
     }
 
     /** Deletes older automatic backups beyond the newest [KEEP]. Files you put there yourself are left alone. */
-    private fun prune(context: Context, tree: Uri) {
+    private fun prune(context: Context, tree: Uri, dir: String) {
         val resolver = context.contentResolver
-        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-        val ours = mutableListOf<Pair<String, String>>()
-        resolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { c ->
-            while (c.moveToNext()) {
-                val name = c.getString(1) ?: continue
-                if (name.startsWith(PREFIX) && name.endsWith(".xlsx")) ours += c.getString(0) to name
-            }
-        }
         // Names carry the date and time, so sorting by name sorts by age.
-        ours.sortedByDescending { it.second }.drop(KEEP).forEach { (id, _) ->
-            runCatching { DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, id)) }
+        children(context, tree, dir).filter { !it.isDir && isBackupFile(it.name) }.sortedByDescending { it.name }.drop(KEEP).forEach {
+            runCatching { DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, it.id)) }
         }
     }
 
-    /** The picked folder's name, to show in Settings. */
+    /** Where backups are saved, like "My Drive › Saral Money Tracker backups", to show in Settings. */
     fun folderName(context: Context, folder: String?): String? {
         folder ?: return null
-        return runCatching {
-            val tree = Uri.parse(folder)
-            val doc = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-            context.contentResolver.query(doc, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { c ->
-                if (c.moveToFirst()) c.getString(0) else null
-            }
-        }.getOrNull()
+        return runCatching { target(context, Uri.parse(folder), create = false).path.ifEmpty { null } }.getOrNull()
     }
 
     /** When the app opens: catch up on a backup that the alarm missed. */

@@ -59,6 +59,21 @@ fun BackupDialog(settings: SettingsRepository, prefs: AppPrefs, onDismiss: () ->
         }
     }
 
+    /** Backs up now and says where the file went (or that it failed). */
+    suspend fun backUpNow() {
+        busy = true
+        val result = withContext(Dispatchers.IO) { AutoBackup.run(context, force = true) }
+        val where = withContext(Dispatchers.IO) { AutoBackup.folderName(context, settings.current().backupFolder) }
+        folderName = where
+        busy = false
+        val message = when {
+            result !is AutoBackup.Result.Done -> context.getString(R.string.backup_failed)
+            where != null -> context.getString(R.string.backup_saved_in, where)
+            else -> context.getString(R.string.backup_done)
+        }
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    }
+
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         // Keep access to the folder after a restart; give up access to the old one.
@@ -68,7 +83,13 @@ fun BackupDialog(settings: SettingsRepository, prefs: AppPrefs, onDismiss: () ->
         prefs.backupFolder?.takeIf { it != uri.toString() }?.let { old ->
             runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
         }
-        apply(uri.toString(), if (prefs.backupFrequency == BackupFrequency.OFF) BackupFrequency.WEEKLY else prefs.backupFrequency)
+        val frequency = if (prefs.backupFrequency == BackupFrequency.OFF) BackupFrequency.WEEKLY else prefs.backupFrequency
+        // Save the first backup straight away: it makes the app's folder and shows that the folder works.
+        scope.launch {
+            settings.setBackup(uri.toString(), frequency)
+            AutoBackup.schedule(context, true)
+            backUpNow()
+        }
     }
 
     AlertDialog(
@@ -82,6 +103,7 @@ fun BackupDialog(settings: SettingsRepository, prefs: AppPrefs, onDismiss: () ->
                     folderName ?: stringResource(if (prefs.backupFolder == null) R.string.backup_choose_folder else R.string.backup_folder_missing),
                     onClick = { runCatching { pick.launch(null) } },
                 )
+                Text(stringResource(R.string.backup_drive_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(stringResource(R.string.backup_how_often), style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(BackupFrequency.OFF to R.string.backup_off, BackupFrequency.DAILY to R.string.backup_daily, BackupFrequency.WEEKLY to R.string.backup_weekly).forEach { (f, label) ->
@@ -102,16 +124,7 @@ fun BackupDialog(settings: SettingsRepository, prefs: AppPrefs, onDismiss: () ->
         confirmButton = {
             TextButton(
                 enabled = prefs.backupFolder != null && !busy,
-                onClick = {
-                    busy = true
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) { AutoBackup.run(context, force = true) }
-                        busy = false
-                        Toast.makeText(
-                            context, if (result is AutoBackup.Result.Done) R.string.backup_done else R.string.backup_failed, Toast.LENGTH_LONG,
-                        ).show()
-                    }
-                },
+                onClick = { scope.launch { backUpNow() } },
             ) { Text(stringResource(R.string.backup_now)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },

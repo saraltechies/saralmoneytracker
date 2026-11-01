@@ -33,7 +33,7 @@ class UpgradeAndReportTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun version1DataMovesToPersonalBook() = runBlocking {
+    fun version1DataMovesToPersonalBook(): Unit = runBlocking {
         context.deleteDatabase(MoneyDb.NAME)
         // The 1.0 schema, exactly as it shipped.
         SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(MoneyDb.NAME).apply { parentFile?.mkdirs() }, null).use { db ->

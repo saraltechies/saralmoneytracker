@@ -159,7 +159,7 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         right += s(R.string.pdf_start_date) to Dates.medium(loan.startDate)
         right += s(R.string.pdf_interest) to if (loan.rate > 0) rate(loan.rate, loan.rateUnit) else s(R.string.loan_no_interest)
         right += s(R.string.pdf_repayment) to if (loan.plan == LoanPlan.MONTHLY) s(R.string.pdf_emi_plan, m(loan.installment), loan.installments) else s(R.string.loan_any_time)
-        if (contact.reference.isNotBlank()) right += s(R.string.contact_reference) to contact.reference
+        if (contact.reference.isNotBlank()) right += s(R.string.pdf_reference) to contact.reference
 
         val leftHeight = 18f + left.sumOf { (t, _) -> wrap(t, paint(9f), half - 20f).size } * 12f
         val rightHeight = 18f + right.size * 13f
@@ -182,8 +182,11 @@ class StatementPdf(private val context: Context, private val currency: CurrencyI
         var ry = y + 16f
         for ((k, v) in right) {
             ry += 13f
+            // The label keeps its room; a long value is shortened rather than running into it.
+            val labelWidth = paint(8.5f, slate).measureText(k)
             canvas.drawText(k, rx + 10f, ry, paint(8.5f, slate))
-            canvas.drawText(clip(v, paint(8.5f, ink, bold = true), half * 0.55f), rx + half - 10f, ry, paint(8.5f, ink, bold = true, align = Paint.Align.RIGHT))
+            val valueRoom = (half - 20f - labelWidth - 10f).coerceAtLeast(half * 0.3f)
+            canvas.drawText(clip(v, paint(8.5f, ink, bold = true), valueRoom), rx + half - 10f, ry, paint(8.5f, ink, bold = true, align = Paint.Align.RIGHT))
         }
         y += boxHeight + 14f
     }

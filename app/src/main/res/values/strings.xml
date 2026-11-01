@@ -581,6 +581,7 @@
     <string name="pdf_pay_to">Pay to: %1$s</string>
     <string name="pdf_scan_to_pay">Scan to pay %1$s</string>
     <string name="pdf_upi_note">Loan repayment %1$s</string>
+    <string name="pdf_reference">Reference</string>
     <string name="pdf_tax_id">PAN / GSTIN: %1$s</string>
     <string name="pdf_account_short">A/c %1$s</string>
     <string name="pdf_ifsc_short">IFSC %1$s</string>

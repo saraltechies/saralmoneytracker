@@ -7,6 +7,7 @@ import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_BOOKS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_CATEGORIES
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_CONTACTS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_LOANS
+import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_PARTIES
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_RECURRING
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_TXNS
 import com.saraltechies.saralmoneytracker.model.Account
@@ -25,6 +26,10 @@ import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanSummary
 import com.saraltechies.saralmoneytracker.model.LoanEvent
 import com.saraltechies.saralmoneytracker.model.BookReport
+import com.saraltechies.saralmoneytracker.model.LedgerEntry
+import com.saraltechies.saralmoneytracker.model.Ledgers
+import com.saraltechies.saralmoneytracker.model.Party
+import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.Recurrence
 import com.saraltechies.saralmoneytracker.model.Reports
 import com.saraltechies.saralmoneytracker.model.Recurring
@@ -57,6 +62,19 @@ data class ImportOptions(
     /** The book for anything the file doesn't place in a book of its own. */
     val bookId: Long = Books.PERSONAL_ID,
 )
+
+/** A customer or supplier as the screens show them: details, balance (plus: they owe you) and every entry. */
+data class PartyItem(
+    val party: Party,
+    val name: String,
+    val contact: Contact?,
+    val opening: Long,
+    val entries: List<LedgerEntry>,
+    val txns: List<Txn>,
+) {
+    val balance: Long get() = entries.lastOrNull()?.balanceAfter ?: opening
+    val lastDate: LocalDate? get() = entries.lastOrNull { it.txnId != null }?.date
+}
 
 /** A loan as the screens show it: the person's name, its history and where it stands. */
 data class LoanItem(
@@ -159,7 +177,7 @@ class MoneyRepository(private val context: Context) {
     fun bookHasHistory(id: Long): Boolean = db.readableDatabase.rawQuery(
         """SELECT 1 FROM $T_TXNS WHERE account_id IN (${accountsIn(id)}) OR to_account_id IN (${accountsIn(id)}) OR category_id IN (${categoriesIn(id)})
            UNION SELECT 1 FROM $T_RECURRING WHERE account_id IN (${accountsIn(id)}) OR category_id IN (${categoriesIn(id)})
-           UNION SELECT 1 FROM $T_LOANS WHERE book_id = $id LIMIT 1""",
+           UNION SELECT 1 FROM $T_LOANS WHERE book_id = $id UNION SELECT 1 FROM $T_PARTIES WHERE book_id = $id LIMIT 1""",
         null,
     ).use { it.moveToFirst() }
 
@@ -167,14 +185,17 @@ class MoneyRepository(private val context: Context) {
     suspend fun deleteBook(id: Long): Boolean {
         if (id == Books.PERSONAL_ID || withContext(Dispatchers.IO) { bookHasHistory(id) }) return false
         write { w ->
-            for (table in listOf(T_ACCOUNTS, T_CATEGORIES, T_CONTACTS)) w.delete(table, "book_id = ?", arrayOf(id.toString()))
+            for (table in listOf(T_ACCOUNTS, T_CATEGORIES, T_CONTACTS, T_PARTIES)) w.delete(table, "book_id = ?", arrayOf(id.toString()))
             w.delete(T_BOOKS, "id = ?", arrayOf(id.toString()))
         }
         if (scope.value == id) scope.value = Books.ALL
         return true
     }
 
-    private fun changed() = version.update { it + 1 }
+    private fun changed() {
+        version.update { it + 1 }
+        com.saraltechies.saralmoneytracker.util.Widgets.requestUpdate(context)
+    }
 
     private suspend fun <T> write(block: (SQLiteDatabase) -> T): T = withContext(Dispatchers.IO) {
         val w = db.writableDatabase
@@ -196,7 +217,7 @@ class MoneyRepository(private val context: Context) {
         val b = resolve(book)
         val where = listOfNotNull(
             if (includeArchived) null else "archived = 0",
-            if (includeLoans) null else "type != '${AccountType.LOAN.name}'",
+            if (includeLoans) null else "type NOT IN ('${AccountType.LOAN.name}', '${AccountType.PARTY.name}')",
             if (b == Books.ALL) null else "book_id = $b",
         ).joinToString(" AND ").ifEmpty { null }
         return db.readableDatabase.query(T_ACCOUNTS, null, where, null, null, null, "book_id, sort, id")
@@ -291,7 +312,7 @@ class MoneyRepository(private val context: Context) {
 
     fun exportData() = BackupFormat.Data(
         accounts(true, book = Books.ALL), categories(true, book = Books.ALL), txns(book = Books.ALL), recurring(book = Books.ALL),
-        loans(book = Books.ALL), contacts(includeSelf = true), books(),
+        loans(book = Books.ALL), contacts(includeSelf = true), books(), parties(book = Books.ALL),
     )
 
     /** How often each category was used since [since], to put the usual ones first when adding an entry. */
@@ -330,6 +351,95 @@ class MoneyRepository(private val context: Context) {
     }
 
     fun loanItem(id: Long, asOf: LocalDate = LocalDate.now()): LoanItem? = loanItems(asOf, book = Books.ALL).firstOrNull { it.loan.id == id }
+
+    // ---- Credit ledger (customers and suppliers) ------------------------------------------------------------
+
+    fun parties(book: Long? = null): List<Party> {
+        val b = resolve(book)
+        return db.readableDatabase.query(T_PARTIES, null, if (b == Books.ALL) null else "book_id = $b", null, null, null, "id")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.party(c)) } }
+    }
+
+    /** Every customer and supplier (of [book]) with their balance and entries. */
+    fun partyItems(book: Long? = null): List<PartyItem> {
+        val parties = parties(book)
+        if (parties.isEmpty()) return emptyList()
+        val accounts = accounts(includeArchived = true, includeLoans = true, book = Books.ALL).associateBy { it.id }
+        val contacts = contacts().associateBy { it.id }
+        val ids = parties.joinToString(",") { it.accountId.toString() }
+        val txns = db.readableDatabase.query(T_TXNS, null, "account_id IN ($ids) OR to_account_id IN ($ids)", null, null, null, "day, created")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.txn(c)) } }
+        return parties.map { p ->
+            val mine = txns.filter { it.accountId == p.accountId || it.toAccountId == p.accountId }
+            val opening = accounts[p.accountId]?.opening ?: 0
+            PartyItem(p, accounts[p.accountId]?.name.orEmpty(), p.contactId?.let { contacts[it] }, opening, Ledgers.entries(p, opening, mine), mine)
+        }
+    }
+
+    fun partyItem(id: Long): PartyItem? = partyItems(Books.ALL).firstOrNull { it.party.id == id }
+
+    /** The party an account belongs to, so an entry opened from a list goes to that customer's or supplier's page. */
+    fun partyForAccount(accountId: Long): Party? = db.readableDatabase.query(T_PARTIES, null, "account_id = ?", arrayOf(accountId.toString()), null, null, null)
+        .use { c -> if (c.moveToFirst()) MoneyDb.party(c) else null }
+
+    /**
+     * Adds a customer or supplier. [opening] is what was owed before the app (plus: they owe you), kept as the
+     * party account's opening balance so it doesn't count as a sale or change your other balances.
+     */
+    suspend fun createParty(contact: Contact, role: PartyRole, bookId: Long, opening: Long): Long = write { w ->
+        val contactId = saveContactIn(w, contact)
+        val account = Account(
+            name = uniqueAccountName(w, contact.name.trim(), null), type = AccountType.PARTY, opening = opening,
+            sort = Int.MAX_VALUE / 2, bookId = bookId,
+        )
+        val accountId = w.insert(T_ACCOUNTS, null, MoneyDb.values(account))
+        w.insert(T_PARTIES, null, MoneyDb.values(Party(accountId = accountId, contactId = contactId, role = role, bookId = bookId)))
+    }
+
+    suspend fun updateParty(party: Party, contact: Contact, role: PartyRole, bookId: Long, opening: Long) = write { w ->
+        val contactId = saveContactIn(w, contact)
+        w.update(T_PARTIES, MoneyDb.values(party.copy(contactId = contactId, role = role, bookId = bookId)), "id = ?", arrayOf(party.id.toString()))
+        w.execSQL(
+            "UPDATE $T_ACCOUNTS SET name = ?, book_id = ?, opening = ? WHERE id = ?",
+            arrayOf<Any?>(uniqueAccountName(w, contact.name.trim(), party.accountId), bookId, opening, party.accountId),
+        )
+        if (party.contactId != null && party.contactId != contactId) deleteContactIfUnused(w, party.contactId)
+    }
+
+    /**
+     * Records one line of a party's account. [gave] means you gave (goods sold on credit, or money); otherwise you
+     * got (a payment, or goods bought on credit). With [categoryId] it is goods: a sale or purchase that counts in
+     * profit; without, money moving between [accountId] and the party.
+     */
+    suspend fun savePartyEntry(
+        party: Party, gave: Boolean, amount: Long, date: LocalDate, accountId: Long?, categoryId: Long?, note: String, existing: Txn? = null,
+    ) = write { w ->
+        val t = when {
+            categoryId != null -> Txn(
+                type = if (gave) TxnType.INCOME else TxnType.EXPENSE, amount = amount, date = date, categoryId = categoryId,
+                accountId = party.accountId, note = note.trim(),
+            )
+            gave -> Txn(type = TxnType.TRANSFER, amount = amount, date = date, categoryId = null, accountId = accountId ?: return@write, toAccountId = party.accountId, note = note.trim())
+            else -> Txn(type = TxnType.TRANSFER, amount = amount, date = date, categoryId = null, accountId = party.accountId, toAccountId = accountId ?: return@write, note = note.trim())
+        }
+        if (existing == null) w.insert(T_TXNS, null, MoneyDb.values(t))
+        else w.update(T_TXNS, MoneyDb.values(t.copy(id = existing.id, createdAt = existing.createdAt)), "id = ?", arrayOf(existing.id.toString()))
+    }
+
+    /** Deletes a customer or supplier with every entry; sales and purchases recorded with them go too. */
+    suspend fun deleteParty(party: Party) = write { w ->
+        w.delete(T_TXNS, "account_id = ? OR to_account_id = ?", arrayOf(party.accountId.toString(), party.accountId.toString()))
+        w.delete(T_PARTIES, "id = ?", arrayOf(party.id.toString()))
+        w.delete(T_ACCOUNTS, "id = ?", arrayOf(party.accountId.toString()))
+        party.contactId?.let { deleteContactIfUnused(w, it) }
+    }
+
+    /** The category goods sold (or bought) on credit go to by default: Sales or Purchases, else the first one. */
+    fun goodsCategory(bookId: Long, sale: Boolean): Category? {
+        val kind = if (sale) TxnType.INCOME else TxnType.EXPENSE
+        val list = categories(book = bookId).filter { it.kind == kind }
+        return list.firstOrNull { it.icon == "store" } ?: list.firstOrNull { it.icon == "other" } ?: list.firstOrNull()
+    }
 
     /** The book's income and expense report (a business's profit and loss) for a period. */
     fun bookReport(from: LocalDate, to: LocalDate, book: Long? = null): BookReport {
@@ -459,7 +569,7 @@ class MoneyRepository(private val context: Context) {
 
     /** Deletes everything and starts again with the default accounts and categories. */
     suspend fun deleteAll() = write { w ->
-        listOf(T_TXNS, T_RECURRING, T_LOANS, T_CONTACTS, T_CATEGORIES, T_ACCOUNTS).forEach { w.delete(it, null, null) }
+        listOf(T_TXNS, T_RECURRING, T_LOANS, T_PARTIES, T_CONTACTS, T_CATEGORIES, T_ACCOUNTS).forEach { w.delete(it, null, null) }
         w.delete(T_BOOKS, "id != ?", arrayOf(Books.PERSONAL_ID.toString()))
         w.execSQL("DELETE FROM sqlite_sequence")
         db.seed(w)
@@ -529,7 +639,9 @@ class MoneyRepository(private val context: Context) {
     }
 
     private fun deleteContactIfUnused(w: SQLiteDatabase, contactId: Long) {
-        val used = w.rawQuery("SELECT 1 FROM $T_LOANS WHERE contact_id = ? LIMIT 1", arrayOf(contactId.toString())).use { it.moveToFirst() }
+        val used = w.rawQuery(
+            "SELECT 1 FROM $T_LOANS WHERE contact_id = ?1 UNION SELECT 1 FROM $T_PARTIES WHERE contact_id = ?1 LIMIT 1", arrayOf(contactId.toString()),
+        ).use { it.moveToFirst() }
         if (!used) w.delete(T_CONTACTS, "id = ? AND kind != ?", arrayOf(contactId.toString(), ContactKind.SELF.name))
     }
 
@@ -706,6 +818,17 @@ class MoneyRepository(private val context: Context) {
                 ),
             ).also { id -> loansByAccount[accountId] = Loan(id = id, accountId = accountId, direction = l.direction, startDate = l.startDate) }
             loanIds[key(l.name)] = id
+        }
+        // Customers and suppliers from a backup: their account (created above, type Party) and contact.
+        val partiesByAccount = w.query(T_PARTIES, null, null, null, null, null, null)
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.party(c)) } }.associateBy { it.accountId }.toMutableMap()
+        for (p in result.parties) {
+            val book = bookOf(p.book)
+            val accountId = account(p.name, AccountType.PARTY, book = book)
+            if (partiesByAccount.containsKey(accountId)) continue
+            val contactId = (p.contact ?: p.name).let { contactIds[key(it)] } ?: w.insert(T_CONTACTS, null, MoneyDb.values(Contact(name = p.name)))
+            val party = Party(accountId = accountId, contactId = contactId, role = p.role, bookId = book)
+            partiesByAccount[accountId] = party.copy(id = w.insert(T_PARTIES, null, MoneyDb.values(party)))
         }
         fun loanOf(row: com.saraltechies.saralmoneytracker.xlsx.ImportedRow, from: Long, to: Long?): Long? =
             row.loan?.let { loanIds[key(it)] } ?: loansByAccount[from]?.id ?: to?.let { loansByAccount[it]?.id }

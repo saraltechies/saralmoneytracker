@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -81,11 +82,13 @@ fun AccountsScreen(
     onOpenAccount: (Long) -> Unit,
     onTransfer: () -> Unit,
     onOpenLoans: () -> Unit,
+    onOpenLedger: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val data by remember { repository.watch { Triple(repository.accounts(includeArchived = true, includeLoans = true), repository.balances(), repository.loanItems()) } }
         .collectAsStateWithLifecycle(null)
+    val parties by remember { repository.watch { repository.partyItems() } }.collectAsStateWithLifecycle(emptyList())
     val bookState = LocalBooks.current
     var editing by remember { mutableStateOf<Account?>(null) }
 
@@ -108,9 +111,10 @@ fun AccountsScreen(
     ) { padding ->
         val (allAccounts, balances, loans) = data ?: return@Scaffold
         // Loans have their own screen; open ones still count in net worth (money owed to you, or by you).
-        val accounts = allAccounts.filter { it.type != AccountType.LOAN }
+        val accounts = allAccounts.filter { !it.type.isHidden }
         val openLoanAccounts = loans.filter { !it.loan.closed }.map { it.loan.accountId }.toSet()
-        val loanBalances = allAccounts.filter { it.id in openLoanAccounts }.map { balances[it.id] ?: 0 }
+        // Customers' and suppliers' credit balances count too: what they owe you, and what you owe them.
+        val loanBalances = allAccounts.filter { it.id in openLoanAccounts || it.type == AccountType.PARTY }.map { balances[it.id] ?: 0 }
         val active = accounts.filter { !it.archived }
         val hidden = accounts.filter { it.archived }
         val assets = active.sumOf { (balances[it.id] ?: 0).coerceAtLeast(0) } + loanBalances.sumOf { it.coerceAtLeast(0) }
@@ -181,6 +185,26 @@ fun AccountsScreen(
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            item {
+                val toGet = parties.sumOf { it.balance.coerceAtLeast(0) }
+                val toGive = -parties.sumOf { it.balance.coerceAtMost(0) }
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onOpenLedger).padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconBadge(Icons.Filled.Store, MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.ledger_title), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            if (parties.isEmpty()) stringResource(R.string.ledger_row_empty)
+                            else stringResource(R.string.ledger_row_summary, money(toGet), money(toGive)),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             if (hidden.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.hidden_accounts)) }
                 items(hidden, key = { it.id }) { a ->
@@ -240,7 +264,7 @@ private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Acco
                 )
                 BookChips(bookId, onSelect = { bookId = it }, modifier = Modifier.fillMaxWidth())
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AccountType.entries.filter { it != AccountType.LOAN }.forEach { t ->
+                    AccountType.entries.filter { !it.isHidden }.forEach { t ->
                         FilterChip(selected = type == t, onClick = { type = t }, label = { Text(stringResource(accountTypeLabel(t))) })
                     }
                 }

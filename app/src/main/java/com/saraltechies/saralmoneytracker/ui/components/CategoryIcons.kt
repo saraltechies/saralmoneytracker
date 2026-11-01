@@ -131,6 +131,7 @@ object CategoryIcons {
         AccountType.WALLET -> Icons.Filled.AccountBalanceWallet
         AccountType.OTHER -> Icons.Filled.Savings
         AccountType.LOAN -> Icons.Filled.Handshake
+        AccountType.PARTY -> Icons.Filled.Store
     }
 }
 

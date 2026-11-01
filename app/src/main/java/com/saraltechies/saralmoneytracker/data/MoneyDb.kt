@@ -20,13 +20,15 @@ import com.saraltechies.saralmoneytracker.model.Loan
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.RateUnit
+import com.saraltechies.saralmoneytracker.model.Party
+import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
 import java.time.LocalDate
 
 /**
- * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only seven tables.
+ * The on-device database. Plain SQLite keeps the app small and free of code generation; there are only eight tables.
  * Dates are stored as epoch days, amounts as hundredths.
  */
 class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, null, VERSION) {
@@ -62,6 +64,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
                 start_day INTEGER NOT NULL, next_day INTEGER NOT NULL, end_day INTEGER, active INTEGER NOT NULL DEFAULT 1)""",
         )
         createBooks(db)
+        createParties(db)
         seed(db)
     }
 
@@ -83,6 +86,18 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             }
         }
         if (oldVersion < 4) createBooks(db)
+        if (oldVersion < 5) createParties(db)
+    }
+
+    /** Version 5: the credit ledger. Each customer or supplier has a hidden PARTY account holding what they owe. */
+    private fun createParties(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE parties (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, contact_id INTEGER, role TEXT NOT NULL,
+                book_id INTEGER NOT NULL DEFAULT ${Books.PERSONAL_ID}, created INTEGER NOT NULL)""",
+        )
+        db.execSQL("CREATE INDEX txns_account ON txns(account_id)")
+        db.execSQL("CREATE INDEX txns_to_account ON txns(to_account_id)")
     }
 
     /**
@@ -134,7 +149,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
 
     companion object {
         const val NAME = "money.db"
-        const val VERSION = 4
+        const val VERSION = 5
         const val T_ACCOUNTS = "accounts"
         const val T_CATEGORIES = "categories"
         const val T_TXNS = "txns"
@@ -142,6 +157,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         const val T_LOANS = "loans"
         const val T_CONTACTS = "contacts"
         const val T_BOOKS = "books"
+        const val T_PARTIES = "parties"
 
         fun values(a: Account) = ContentValues().apply {
             if (a.id != 0L) put("id", a.id)
@@ -274,6 +290,24 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             name = c.str("name"),
             kind = if (c.str("kind") == BookKind.BUSINESS.name) BookKind.BUSINESS else BookKind.PERSONAL,
             sort = c.int("sort"),
+        )
+
+        fun values(p: Party) = ContentValues().apply {
+            if (p.id != 0L) put("id", p.id)
+            put("account_id", p.accountId)
+            if (p.contactId != null) put("contact_id", p.contactId) else putNull("contact_id")
+            put("role", p.role.name)
+            put("book_id", p.bookId)
+            put("created", if (p.createdAt != 0L) p.createdAt else System.currentTimeMillis())
+        }
+
+        fun party(c: Cursor) = Party(
+            id = c.long("id"),
+            accountId = c.long("account_id"),
+            contactId = c.longOrNull("contact_id"),
+            role = if (c.str("role") == PartyRole.SUPPLIER.name) PartyRole.SUPPLIER else PartyRole.CUSTOMER,
+            bookId = c.long("book_id"),
+            createdAt = c.long("created"),
         )
 
         private fun Cursor.long(name: String) = getLong(getColumnIndexOrThrow(name))

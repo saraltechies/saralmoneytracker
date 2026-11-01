@@ -66,11 +66,16 @@ fun TxnRow(txn: Txn, lookups: Lookups, onClick: () -> Unit, showDate: Boolean = 
         )
     }
     val title = when (txn.type) {
-        TxnType.TRANSFER -> loanTitle ?: bookFlowTitle(lookups, account, toAccount) ?: stringResource(R.string.type_transfer)
+        TxnType.TRANSFER -> loanTitle ?: partyTitle(account, toAccount) ?: bookFlowTitle(lookups, account, toAccount) ?: stringResource(R.string.type_transfer)
         else -> category?.name ?: stringResource(R.string.uncategorized)
     }
     val accountText = when {
         loanAccount != null -> (if (loanAccount.id == txn.toAccountId) account else toAccount)?.name.orEmpty()
+        // Money to or from a customer or supplier: the account on your side.
+        txn.type == TxnType.TRANSFER && toAccount?.type == AccountType.PARTY -> account?.name.orEmpty()
+        txn.type == TxnType.TRANSFER && account?.type == AccountType.PARTY -> toAccount?.name.orEmpty()
+        // A sale or purchase on credit.
+        account?.type == AccountType.PARTY -> stringResource(R.string.txn_on_credit, account.name)
         txn.type == TxnType.TRANSFER -> "${account?.name.orEmpty()} → ${toAccount?.name.orEmpty()}"
         // A business expense paid from a personal account (or the other way round) says whose account paid.
         lookups.multipleBooks && category != null && account != null && category.bookId != account.bookId ->
@@ -139,4 +144,12 @@ private fun bookFlowTitle(lookups: Lookups, from: Account?, to: Account?): Strin
         Books.Flow.DRAWINGS -> stringResource(R.string.txn_drawings, fromBook?.name.orEmpty())
         Books.Flow.BETWEEN -> stringResource(R.string.txn_between_books, toBook?.name.orEmpty())
     }
+}
+
+/** "Payment from Ramesh", "Paid to Gupta Wholesale" for money to or from a customer or supplier. */
+@Composable
+private fun partyTitle(from: Account?, to: Account?): String? = when {
+    from?.type == AccountType.PARTY -> stringResource(R.string.txn_party_received, from.name)
+    to?.type == AccountType.PARTY -> stringResource(R.string.txn_party_paid, to.name)
+    else -> null
 }

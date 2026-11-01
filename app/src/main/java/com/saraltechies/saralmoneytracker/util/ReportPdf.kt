@@ -86,6 +86,13 @@ class ReportPdf(private val context: Context, private val currency: CurrencyInfo
                     null, ink,
                 )
             }
+            if (report.customersOwe != 0L || report.oweSuppliers != 0L) {
+                section(
+                    s(R.string.ledger_title),
+                    listOf(s(R.string.ledger_customers_owe) to report.customersOwe, s(R.string.ledger_you_owe_suppliers) to report.oweSuppliers),
+                    null, ink,
+                )
+            }
             note(s(R.string.report_note))
             finishPage()
             doc.writeTo(out)

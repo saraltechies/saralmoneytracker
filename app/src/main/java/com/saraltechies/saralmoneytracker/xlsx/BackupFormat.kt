@@ -10,6 +10,8 @@ import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.Loan
+import com.saraltechies.saralmoneytracker.model.Party
+import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.RateUnit
@@ -35,6 +37,7 @@ object BackupFormat {
     const val SHEET_LOANS = "Loans"
     const val SHEET_CONTACTS = "Contacts"
     const val SHEET_BOOKS = "Books"
+    const val SHEET_PARTIES = "Credit ledger"
 
     private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note", "Loan", "Book")
 
@@ -51,6 +54,7 @@ object BackupFormat {
         val loans: List<Loan> = emptyList(),
         val contacts: List<Contact> = emptyList(),
         val books: List<Book> = emptyList(),
+        val parties: List<Party> = emptyList(),
     )
 
     fun writeXlsx(data: Data, out: OutputStream, exportedOn: LocalDate, appVersion: String) {
@@ -136,6 +140,15 @@ object BackupFormat {
                 },
             widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8, 22, 16),
         )
+        if (data.parties.isNotEmpty()) {
+            w.sheet(
+                SHEET_PARTIES,
+                listOf(listOf("Name", "Role", "Contact", "Book")) + data.parties.map { p ->
+                    listOf(acc[p.accountId]?.name.orEmpty(), roleName(p.role), p.contactId?.let { contactNames[it] }.orEmpty(), bookOf(p.bookId))
+                },
+                widths = listOf(24, 12, 24, 16),
+            )
+        }
         if (data.books.size > 1) {
             w.sheet(SHEET_BOOKS, listOf(listOf("Name", "Type")) + data.books.map { listOf(it.name, bookKindName(it.kind)) }, widths = listOf(24, 12))
         }
@@ -199,6 +212,7 @@ object BackupFormat {
         AccountType.WALLET -> "Wallet"
         AccountType.OTHER -> "Other"
         AccountType.LOAN -> "Loan"
+        AccountType.PARTY -> "Party"
     }
 
     fun parseAccountType(text: String): AccountType =
@@ -250,4 +264,11 @@ object BackupFormat {
     }
 
     fun parseBookKind(text: String): BookKind = if (text.trim().equals("business", true)) BookKind.BUSINESS else BookKind.PERSONAL
+
+    fun roleName(r: PartyRole) = when (r) {
+        PartyRole.CUSTOMER -> "Customer"
+        PartyRole.SUPPLIER -> "Supplier"
+    }
+
+    fun parseRole(text: String): PartyRole = if (text.trim().equals("supplier", true)) PartyRole.SUPPLIER else PartyRole.CUSTOMER
 }

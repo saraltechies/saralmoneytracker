@@ -6,6 +6,7 @@ import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
+import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.RateUnit
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.TxnType
@@ -45,6 +46,8 @@ data class ImportedLoan(
     val contact: String? = null,
     val book: String? = null,
 )
+
+data class ImportedParty(val name: String, val role: PartyRole, val contact: String?, val book: String?)
 
 data class ImportedAccount(val name: String, val type: AccountType, val opening: Long, val archived: Boolean = false, val book: String? = null)
 
@@ -91,6 +94,8 @@ data class ImportResult(
     val contactBooks: List<String?> = emptyList(),
     /** Books named in the file, with their kind. */
     val books: List<Book> = emptyList(),
+    /** Customers and suppliers of the credit ledger, by their account name. */
+    val parties: List<ImportedParty> = emptyList(),
 ) {
     val isEmpty: Boolean get() = rows.isEmpty() && accounts.isEmpty() && categories.isEmpty() && recurring.isEmpty() && loans.isEmpty() && contacts.isEmpty()
 }
@@ -225,9 +230,16 @@ object SpreadsheetImport {
                 Book(name = name, kind = BackupFormat.parseBookKind(text(s, r, h["type"])))
             }
         }.orEmpty()
+        val parties = sheet(BackupFormat.SHEET_PARTIES)?.let { s ->
+            val h = headerIndex(s, 0)
+            (1..s.lastRow).mapNotNull { r ->
+                val name = text(s, r, h["name"]).ifEmpty { return@mapNotNull null }
+                ImportedParty(name, BackupFormat.parseRole(text(s, r, h["role"])), text(s, r, h["contact"]).ifEmpty { null }, text(s, r, h["book"]).ifEmpty { null })
+            }
+        }.orEmpty()
         return ImportResult(
             unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true, loans = loans,
-            contacts = contactRows.map { it.first }, contactBooks = contactRows.map { it.second }, books = books,
+            contacts = contactRows.map { it.first }, contactBooks = contactRows.map { it.second }, books = books, parties = parties,
         )
     }
 

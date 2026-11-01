@@ -23,6 +23,7 @@ import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
 import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.LoanDirection
+import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.PeriodKind
 import com.saraltechies.saralmoneytracker.model.TxnType
 import com.saraltechies.saralmoneytracker.ui.accounts.AccountsScreen
@@ -39,6 +40,9 @@ import com.saraltechies.saralmoneytracker.ui.contacts.MyDetailsScreen
 import com.saraltechies.saralmoneytracker.ui.edit.EditScreen
 import com.saraltechies.saralmoneytracker.ui.home.HomeScreen
 import com.saraltechies.saralmoneytracker.ui.importing.ImportScreen
+import com.saraltechies.saralmoneytracker.ui.ledger.LedgerScreen
+import com.saraltechies.saralmoneytracker.ui.ledger.PartyEditScreen
+import com.saraltechies.saralmoneytracker.ui.ledger.PartyScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoanDetailScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoanEditScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoansScreen
@@ -61,6 +65,12 @@ private object Routes {
     const val LOANS = "loans"
     const val MY_DETAILS = "myDetails"
     const val BOOKS = "books"
+    const val LEDGER = "ledger"
+    const val PARTY = "party/{id}"
+    const val PARTY_EDIT = "partyEdit?id={id}&role={role}"
+
+    fun party(id: Long) = "party/$id"
+    fun partyEdit(id: Long = 0, role: PartyRole = PartyRole.CUSTOMER) = "partyEdit?id=$id&role=${role.name}"
     const val LOAN = "loan/{id}"
     const val LOAN_EDIT = "loanEdit?id={id}&dir={dir}"
 
@@ -127,6 +137,7 @@ fun AppNav(
                     onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                     onImport = { nav.navigate(Routes.IMPORT) },
                     onOpenLoans = { nav.navigate(Routes.LOANS) },
+                    onOpenLedger = { nav.navigate(Routes.LEDGER) },
                     onOpenLoan = { nav.navigate(Routes.loan(it)) },
                     onSelectBook = selectBook,
                     onManageBooks = { nav.navigate(Routes.BOOKS) },
@@ -194,6 +205,7 @@ fun AppNav(
                     onOpenAccount = { nav.navigate("account/$it") },
                     onTransfer = { nav.navigate(Routes.edit(type = TxnType.TRANSFER)) },
                     onOpenLoans = { nav.navigate(Routes.LOANS) },
+                    onOpenLedger = { nav.navigate(Routes.LEDGER) },
                 )
             }
             composable(
@@ -221,6 +233,10 @@ fun AppNav(
                         }
                     },
                     onManageCategories = { nav.navigate(Routes.CATEGORIES) },
+                    onOpenParty = { id ->
+                        nav.popBackStack()
+                        nav.navigate(Routes.party(id))
+                    },
                     onOpenLoan = { id ->
                         nav.popBackStack()
                         nav.navigate(Routes.loan(id))
@@ -238,6 +254,7 @@ fun AppNav(
                     onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
                     onLoans = { nav.navigate(Routes.LOANS) },
                     onBooks = { nav.navigate(Routes.BOOKS) },
+                    onLedger = { nav.navigate(Routes.LEDGER) },
                     onRecurring = { nav.navigate(Routes.RECURRING) },
                     onImport = { nav.navigate(Routes.IMPORT) },
                 )
@@ -253,6 +270,42 @@ fun AppNav(
             }
             composable(Routes.MY_DETAILS) { MyDetailsScreen(repository, onBack = { nav.popBackStack() }) }
             composable(Routes.BOOKS) { BooksScreen(repository, snackbar, onBack = { nav.popBackStack() }, onSelect = selectBook) }
+            composable(Routes.LEDGER) {
+                LedgerScreen(
+                    repository,
+                    onBack = { nav.popBackStack() },
+                    onOpen = { nav.navigate(Routes.party(it)) },
+                    onAdd = { nav.navigate(Routes.partyEdit(role = it)) },
+                )
+            }
+            composable(Routes.PARTY, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                PartyScreen(
+                    repository, id,
+                    onBack = { nav.popBackStack() },
+                    onEdit = { nav.navigate(Routes.partyEdit(id = id)) },
+                    onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
+                )
+            }
+            composable(
+                Routes.PARTY_EDIT,
+                arguments = listOf(
+                    navArgument("id") { type = NavType.LongType; defaultValue = 0L },
+                    navArgument("role") { type = NavType.StringType; defaultValue = PartyRole.CUSTOMER.name },
+                ),
+            ) { entry ->
+                val args = entry.arguments
+                PartyEditScreen(
+                    repository,
+                    partyId = args?.getLong("id") ?: 0L,
+                    initialRole = if (args?.getString("role") == PartyRole.SUPPLIER.name) PartyRole.SUPPLIER else PartyRole.CUSTOMER,
+                    onBack = { nav.popBackStack() },
+                    onSaved = { id ->
+                        nav.popBackStack()
+                        nav.navigate(Routes.party(id))
+                    },
+                )
+            }
             composable(Routes.LOANS) {
                 LoansScreen(
                     repository,

@@ -94,6 +94,7 @@ private class HomeData(
     val upcoming: List<Pair<LocalDate, com.saraltechies.saralmoneytracker.model.Recurring>> = emptyList(),
     val lookups: Lookups = Lookups(emptyList(), emptyList()),
     val loans: List<com.saraltechies.saralmoneytracker.data.LoanItem> = emptyList(),
+    val parties: List<com.saraltechies.saralmoneytracker.data.PartyItem> = emptyList(),
     val loaded: Boolean = false,
 )
 
@@ -116,6 +117,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onImport: () -> Unit,
     onOpenLoans: () -> Unit,
+    onOpenLedger: () -> Unit,
     onOpenLoan: (Long) -> Unit,
     onSelectBook: (Long) -> Unit,
     onManageBooks: () -> Unit,
@@ -154,6 +156,7 @@ fun HomeScreen(
                     .sortedBy { it.first }.take(5),
                 lookups = Lookups(categories, accounts, repository.loanDirections(), repository.books()),
                 loans = repository.loanItems(today).filter { !it.loan.closed },
+                parties = repository.partyItems(),
                 loaded = true,
             )
         }
@@ -208,6 +211,20 @@ fun HomeScreen(
                 )
             }
             item { BudgetCard(data.budget, onOpenBudgets) }
+
+            if (data.parties.isNotEmpty()) {
+                item {
+                    SectionTitle(stringResource(R.string.ledger_title)) { TextButton(onClick = onOpenLedger) { Text(stringResource(R.string.see_all)) } }
+                }
+                item {
+                    LoanTotalsCard(
+                        toReceive = data.parties.sumOf { it.balance.coerceAtLeast(0) },
+                        toPay = -data.parties.sumOf { it.balance.coerceAtMost(0) },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        onClick = onOpenLedger,
+                    )
+                }
+            }
 
             if (data.loans.isNotEmpty()) {
                 item {

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.PeriodKind
 import com.saraltechies.saralmoneytracker.model.Stats
 import com.saraltechies.saralmoneytracker.model.Txn
@@ -85,8 +86,13 @@ fun TransactionsScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var typeFilter by rememberSaveable { mutableStateOf<TxnType?>(null) }
 
-    val lookups by remember { repository.watch { Lookups(repository.categories(true), repository.accounts(true), repository.loanDirections()) } }
+    val lookups by remember { repository.watch { Lookups(repository.categories(true, book = Books.ALL), repository.accounts(true, book = Books.ALL), repository.loanDirections(), repository.books()) } }
         .collectAsStateWithLifecycle(Lookups(emptyList(), emptyList()))
+    // In one book, a day's total counts only that book's income and spending (not a business bill paid from it).
+    val currentBook = com.saraltechies.saralmoneytracker.ui.components.LocalBooks.current.current
+    val inBook: (com.saraltechies.saralmoneytracker.model.Txn) -> Boolean = { t ->
+        currentBook == Books.ALL || t.categoryId?.let { lookups.categories[it]?.bookId } == currentBook
+    }
     val searchText = query.trim().takeIf { searching && it.isNotEmpty() }
     val txns by remember(period, searchText, accountId, categoryId) {
         repository.watch {
@@ -137,7 +143,7 @@ fun TransactionsScreen(
                 else -> {
                     val byDay = shown.groupBy { it.date }
                     for ((date, dayTxns) in byDay) {
-                        item(key = "day:$date") { DayHeader(date, Stats.totals(dayTxns).net) }
+                        item(key = "day:$date") { DayHeader(date, Stats.totals(dayTxns.filter { t -> inBook(t) }).net) }
                         items(dayTxns, key = { it.id }) { txn -> TxnRow(txn, lookups, onClick = { onOpenTxn(txn.id) }, accountFocus = accountId) }
                     }
                 }

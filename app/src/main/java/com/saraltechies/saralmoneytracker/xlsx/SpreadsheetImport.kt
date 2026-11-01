@@ -1,6 +1,7 @@
 package com.saraltechies.saralmoneytracker.xlsx
 
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Book
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.LoanDirection
@@ -25,6 +26,8 @@ data class ImportedRow(
     val toAccount: String? = null,
     /** The loan (by its account name) this entry belongs to, from our own export. */
     val loan: String? = null,
+    /** The book its category belongs to, from our own export. */
+    val book: String? = null,
 )
 
 data class ImportedLoan(
@@ -40,9 +43,10 @@ data class ImportedLoan(
     val closed: Boolean,
     /** The contact's name in the Contacts sheet. */
     val contact: String? = null,
+    val book: String? = null,
 )
 
-data class ImportedAccount(val name: String, val type: AccountType, val opening: Long, val archived: Boolean = false)
+data class ImportedAccount(val name: String, val type: AccountType, val opening: Long, val archived: Boolean = false, val book: String? = null)
 
 data class ImportedCategory(
     val name: String,
@@ -50,6 +54,7 @@ data class ImportedCategory(
     val budget: Long?,
     val icon: String? = null,
     val color: Int? = null,
+    val book: String? = null,
 )
 
 data class ImportedRecurring(
@@ -64,6 +69,7 @@ data class ImportedRecurring(
     val nextDate: LocalDate,
     val endDate: LocalDate?,
     val active: Boolean,
+    val book: String? = null,
 )
 
 data class ImportResult(
@@ -81,6 +87,10 @@ data class ImportResult(
     val loans: List<ImportedLoan> = emptyList(),
     /** People, banks and vendors with their details, and your own (kind SELF); ids are not set. */
     val contacts: List<Contact> = emptyList(),
+    /** For each of [contacts], the name of its book (your details are kept per book). */
+    val contactBooks: List<String?> = emptyList(),
+    /** Books named in the file, with their kind. */
+    val books: List<Book> = emptyList(),
 ) {
     val isEmpty: Boolean get() = rows.isEmpty() && accounts.isEmpty() && categories.isEmpty() && recurring.isEmpty() && loans.isEmpty() && contacts.isEmpty()
 }
@@ -122,6 +132,7 @@ object SpreadsheetImport {
                     account = text(s, r, h["account"]).ifEmpty { null },
                     toAccount = text(s, r, h["to account"]).ifEmpty { null },
                     loan = text(s, r, h["loan"]).ifEmpty { null },
+                    book = text(s, r, h["book"]).ifEmpty { null },
                 )
             }
         }
@@ -134,6 +145,7 @@ object SpreadsheetImport {
                     type = BackupFormat.parseAccountType(text(s, r, h["type"])),
                     opening = amount(s.cell(r, h["opening balance"] ?: -1)) ?: 0,
                     archived = text(s, r, h["hidden"]).equals("yes", true),
+                    book = text(s, r, h["book"]).ifEmpty { null },
                 )
             }
         }.orEmpty()
@@ -147,6 +159,7 @@ object SpreadsheetImport {
                     budget = amount(s.cell(r, h["monthly budget"] ?: -1))?.takeIf { it > 0 },
                     icon = text(s, r, h["icon"]).ifEmpty { null },
                     color = text(s, r, h["colour"]).removePrefix("#").toLongOrNull(16)?.toInt(),
+                    book = text(s, r, h["book"]).ifEmpty { null },
                 )
             }
         }.orEmpty()
@@ -167,6 +180,7 @@ object SpreadsheetImport {
                     nextDate = date(s.cell(r, h["next date"] ?: -1)) ?: start,
                     endDate = date(s.cell(r, h["end date"] ?: -1)),
                     active = !text(s, r, h["paused"]).equals("yes", true),
+                    book = text(s, r, h["book"]).ifEmpty { null },
                 )
             }
         }.orEmpty()
@@ -187,11 +201,12 @@ object SpreadsheetImport {
                     note = text(s, r, h["note"]),
                     closed = text(s, r, h["closed"]).equals("yes", true),
                     contact = text(s, r, h["contact"]).ifEmpty { null },
+                    book = text(s, r, h["book"]).ifEmpty { null },
                 )
             }
         }.orEmpty()
         val (unique, duplicates) = dedupe(rows)
-        val contacts = sheet(BackupFormat.SHEET_CONTACTS)?.let { s ->
+        val contactRows = sheet(BackupFormat.SHEET_CONTACTS)?.let { s ->
             val h = headerIndex(s, 0)
             (1..s.lastRow).mapNotNull { r ->
                 val name = text(s, r, h["name"]).ifEmpty { return@mapNotNull null }
@@ -200,10 +215,20 @@ object SpreadsheetImport {
                     email = text(s, r, h["email"]), address = text(s, r, h["address"]), taxId = text(s, r, h["pan / gstin"]),
                     bankName = text(s, r, h["bank"]), bankAccount = text(s, r, h["account number"]), ifsc = text(s, r, h["ifsc"]),
                     upi = text(s, r, h["upi id"]), reference = text(s, r, h["reference"]), note = text(s, r, h["note"]),
-                )
+                ) to text(s, r, h["book"]).ifEmpty { null }
             }
         }.orEmpty()
-        return ImportResult(unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true, loans = loans, contacts = contacts)
+        val books = sheet(BackupFormat.SHEET_BOOKS)?.let { s ->
+            val h = headerIndex(s, 0)
+            (1..s.lastRow).mapNotNull { r ->
+                val name = text(s, r, h["name"]).ifEmpty { return@mapNotNull null }
+                Book(name = name, kind = BackupFormat.parseBookKind(text(s, r, h["type"])))
+            }
+        }.orEmpty()
+        return ImportResult(
+            unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true, loans = loans,
+            contacts = contactRows.map { it.first }, contactBooks = contactRows.map { it.second }, books = books,
+        )
     }
 
     // ---- Hand-made trackers and statements ----------------------------------------------------------------
@@ -421,5 +446,5 @@ object SpreadsheetImport {
     }
 
     fun key(r: ImportedRow): String =
-        listOf(r.type, r.date, r.amount, r.category.lowercase(Locale.ROOT), r.note.lowercase(Locale.ROOT)).joinToString("|")
+        listOf(r.type, r.date, r.amount, r.category.lowercase(Locale.ROOT), r.note.lowercase(Locale.ROOT), r.book.orEmpty().lowercase(Locale.ROOT)).joinToString("|")
 }

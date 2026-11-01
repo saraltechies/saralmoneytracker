@@ -33,6 +33,8 @@ data class AppPrefs(
     /** Minutes after midnight. */
     val reminderMinute: Int,
     val welcomeDismissed: Boolean,
+    /** The book on screen: a book id, or 0 for all books. */
+    val book: Long = 0,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -46,6 +48,7 @@ class SettingsRepository(private val context: Context) {
     private val reminderOnKey = booleanPreferencesKey("reminder_on")
     private val reminderMinuteKey = intPreferencesKey("reminder_minute")
     private val welcomeDismissedKey = booleanPreferencesKey("welcome_dismissed")
+    private val bookKey = longPreferencesKey("book")
     private val goodMomentsKey = intPreferencesKey("good_moments")
     private val reviewPromptsKey = intPreferencesKey("review_prompts")
     private val reviewLastAtKey = longPreferencesKey("review_last_at")
@@ -65,6 +68,7 @@ class SettingsRepository(private val context: Context) {
             reminderOn = p[reminderOnKey] ?: false,
             reminderMinute = p[reminderMinuteKey] ?: DEFAULT_REMINDER_MINUTE,
             welcomeDismissed = p[welcomeDismissedKey] ?: false,
+            book = p[bookKey] ?: 0L,
         )
     }.distinctUntilChanged()
 
@@ -77,6 +81,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAppLock(on: Boolean) = context.dataStore.edit { it[appLockKey] = on }
     suspend fun setHideInRecents(on: Boolean) = context.dataStore.edit { it[hideRecentsKey] = on }
     suspend fun setWelcomeDismissed() = context.dataStore.edit { it[welcomeDismissedKey] = true }
+    suspend fun setBook(id: Long) = context.dataStore.edit { it[bookKey] = id }
 
     suspend fun setReminder(on: Boolean, minute: Int) = context.dataStore.edit {
         it[reminderOnKey] = on

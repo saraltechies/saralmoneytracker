@@ -69,4 +69,50 @@ object DefaultData {
         0xFF06B6D4, 0xFF0EA5E9, 0xFF3B82F6, 0xFF0D6EFD, 0xFF6366F1, 0xFF8B5CF6, 0xFFA855F7, 0xFFEC4899,
         0xFFF472B6, 0xFF64748B, 0xFF94A3B8, 0xFF78716C,
     ).map { it.toInt() }
+
+    /** A business book's starting categories: icon and colour for each, in the order of the business labels. */
+    val businessExpenseStyles = listOf(
+        "store" to 0xFF0D6EFD.toInt(), // Purchases and stock
+        "home" to 0xFF8B5CF6.toInt(), // Rent
+        "work" to 0xFF14B8A6.toInt(), // Salaries and wages
+        "electricity" to 0xFFEAB308.toInt(), // Electricity
+        "bus" to 0xFF3B82F6.toInt(), // Transport and freight
+        "fuel" to 0xFF0EA5E9.toInt(), // Fuel
+        "phone" to 0xFF06B6D4.toInt(), // Phone and internet
+        "laptop" to 0xFF6366F1.toInt(), // Office and supplies
+        "star" to 0xFFEC4899.toInt(), // Marketing
+        "repairs" to 0xFF78716C.toInt(), // Repairs and maintenance
+        "bills" to 0xFFF59E0B.toInt(), // Taxes, GST and fees
+        "card" to 0xFF64748B.toInt(), // Bank charges
+        "interest" to 0xFFEF4444.toInt(), // Interest on loans
+        "education" to 0xFFA855F7.toInt(), // Professional fees
+        "travel" to 0xFFF97316.toInt(), // Travel
+        "other" to 0xFF94A3B8.toInt(), // Other expenses
+    )
+
+    val businessIncomeStyles = listOf(
+        "store" to 0xFF16A34A.toInt(), // Sales
+        "work" to 0xFF0D6EFD.toInt(), // Services
+        "interest" to 0xFF10B981.toInt(), // Interest received
+        "refund" to 0xFF06B6D4.toInt(), // Refunds and discounts
+        "other" to 0xFF94A3B8.toInt(), // Other income
+    )
+
+    class BusinessLabels(val expense: List<String>, val income: List<String>, val cash: String, val bank: String)
+
+    fun businessCategories(labels: BusinessLabels, bookId: Long): List<Category> {
+        require(labels.expense.size == businessExpenseStyles.size && labels.income.size == businessIncomeStyles.size)
+        val expense = labels.expense.mapIndexed { i, name ->
+            Category(name = name, kind = TxnType.EXPENSE, icon = businessExpenseStyles[i].first, color = businessExpenseStyles[i].second, sort = i, bookId = bookId)
+        }
+        val income = labels.income.mapIndexed { i, name ->
+            Category(name = name, kind = TxnType.INCOME, icon = businessIncomeStyles[i].first, color = businessIncomeStyles[i].second, sort = i, bookId = bookId)
+        }
+        return expense + income
+    }
+
+    fun businessAccounts(labels: BusinessLabels, bookId: Long): List<Account> = listOf(
+        Account(name = labels.cash, type = AccountType.CASH, sort = 0, bookId = bookId),
+        Account(name = labels.bank, type = AccountType.BANK, sort = 1, bookId = bookId),
+    )
 }

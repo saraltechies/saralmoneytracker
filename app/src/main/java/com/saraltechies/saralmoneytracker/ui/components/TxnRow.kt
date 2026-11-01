@@ -23,13 +23,22 @@ import androidx.compose.ui.unit.dp
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Book
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.Txn
 import com.saraltechies.saralmoneytracker.model.TxnType
 
 /** Lookup tables a list of entries needs to show names and icons. */
-class Lookups(categories: List<Category>, accounts: List<Account>, val loanDirections: Map<Long, LoanDirection> = emptyMap()) {
+class Lookups(
+    categories: List<Category>,
+    accounts: List<Account>,
+    val loanDirections: Map<Long, LoanDirection> = emptyMap(),
+    books: List<Book> = emptyList(),
+) {
+    val books = books.associateBy { it.id }
+    val multipleBooks = books.size > 1
     val categories = categories.associateBy { it.id }
     val accounts = accounts.associateBy { it.id }
 }
@@ -57,12 +66,15 @@ fun TxnRow(txn: Txn, lookups: Lookups, onClick: () -> Unit, showDate: Boolean = 
         )
     }
     val title = when (txn.type) {
-        TxnType.TRANSFER -> loanTitle ?: stringResource(R.string.type_transfer)
+        TxnType.TRANSFER -> loanTitle ?: bookFlowTitle(lookups, account, toAccount) ?: stringResource(R.string.type_transfer)
         else -> category?.name ?: stringResource(R.string.uncategorized)
     }
     val accountText = when {
         loanAccount != null -> (if (loanAccount.id == txn.toAccountId) account else toAccount)?.name.orEmpty()
         txn.type == TxnType.TRANSFER -> "${account?.name.orEmpty()} → ${toAccount?.name.orEmpty()}"
+        // A business expense paid from a personal account (or the other way round) says whose account paid.
+        lookups.multipleBooks && category != null && account != null && category.bookId != account.bookId ->
+            account.name + " (" + lookups.books[account.bookId]?.name.orEmpty() + ")"
         else -> account?.name.orEmpty()
     }
     val subtitle = listOfNotNull(
@@ -112,5 +124,19 @@ fun DayHeader(date: java.time.LocalDate, net: Long) {
         if (net != 0L) {
             Text(money(net, signed = true), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+/** "Put into Sharma Traders" (capital), "Taken from Sharma Traders" (drawings) for money moved between books. */
+@Composable
+private fun bookFlowTitle(lookups: Lookups, from: Account?, to: Account?): String? {
+    if (!lookups.multipleBooks || from == null || to == null) return null
+    val fromBook = lookups.books[from.bookId]
+    val toBook = lookups.books[to.bookId]
+    return when (Books.flow(fromBook, toBook)) {
+        Books.Flow.SAME_BOOK -> null
+        Books.Flow.CAPITAL_IN -> stringResource(R.string.txn_capital_in, toBook?.name.orEmpty())
+        Books.Flow.DRAWINGS -> stringResource(R.string.txn_drawings, fromBook?.name.orEmpty())
+        Books.Flow.BETWEEN -> stringResource(R.string.txn_between_books, toBook?.name.orEmpty())
     }
 }

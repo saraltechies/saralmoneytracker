@@ -60,7 +60,9 @@ import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.Money
+import com.saraltechies.saralmoneytracker.ui.components.BookChips
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
+import com.saraltechies.saralmoneytracker.ui.components.LocalBooks
 import com.saraltechies.saralmoneytracker.ui.components.IconBadge
 import com.saraltechies.saralmoneytracker.ui.components.LocalCurrency
 import com.saraltechies.saralmoneytracker.ui.components.SectionTitle
@@ -84,6 +86,7 @@ fun AccountsScreen(
     val context = LocalContext.current
     val data by remember { repository.watch { Triple(repository.accounts(includeArchived = true, includeLoans = true), repository.balances(), repository.loanItems()) } }
         .collectAsStateWithLifecycle(null)
+    val bookState = LocalBooks.current
     var editing by remember { mutableStateOf<Account?>(null) }
 
     Scaffold(
@@ -97,7 +100,7 @@ fun AccountsScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { editing = Account(name = "", type = AccountType.BANK) },
+                onClick = { editing = Account(name = "", type = AccountType.BANK, bookId = bookState.defaultBook) },
                 icon = { Icon(Icons.Filled.Add, null) },
                 text = { Text(stringResource(R.string.add_account)) },
             )
@@ -143,7 +146,20 @@ fun AccountsScreen(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                 )
             }
-            items(active, key = { it.id }) { a -> AccountRow(a, balances[a.id] ?: 0, onClick = { onOpenAccount(a.id) }, onEdit = { editing = a }) }
+            val books = bookState.books
+            if (bookState.multiple && bookState.currentBook == null) {
+                // All books: each book's accounts under its name.
+                for (b in books) {
+                    val inBook = active.filter { it.bookId == b.id }
+                    if (inBook.isEmpty()) continue
+                    item(key = "book:${b.id}") {
+                        SectionTitle(b.name + " · " + money(inBook.sumOf { balances[it.id] ?: 0 }))
+                    }
+                    items(inBook, key = { it.id }) { a -> AccountRow(a, balances[a.id] ?: 0, onClick = { onOpenAccount(a.id) }, onEdit = { editing = a }) }
+                }
+            } else {
+                items(active, key = { it.id }) { a -> AccountRow(a, balances[a.id] ?: 0, onClick = { onOpenAccount(a.id) }, onEdit = { editing = a }) }
+            }
             item {
                 val open = loans.filter { !it.loan.closed }
                 val toReceive = open.filter { it.loan.direction == LoanDirection.LENT }.sumOf { it.summary.outstanding }
@@ -209,6 +225,7 @@ private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Acco
     val currency = LocalCurrency.current
     var name by remember { mutableStateOf(account.name) }
     var type by remember { mutableStateOf(account.type) }
+    var bookId by remember { mutableStateOf(account.bookId) }
     var opening by remember { mutableStateOf(if (account.opening == 0L) "" else Money.plain(account.opening)) }
     val openingValue = if (opening.isBlank()) 0L else Money.parse(opening)
     val isNew = account.id == 0L
@@ -221,6 +238,7 @@ private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Acco
                     value = name, onValueChange = { name = it.take(40) }, label = { Text(stringResource(R.string.name)) }, singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                 )
+                BookChips(bookId, onSelect = { bookId = it }, modifier = Modifier.fillMaxWidth())
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AccountType.entries.filter { it != AccountType.LOAN }.forEach { t ->
                         FilterChip(selected = type == t, onClick = { type = t }, label = { Text(stringResource(accountTypeLabel(t))) })
@@ -244,7 +262,7 @@ private fun AccountDialog(account: Account, onDismiss: () -> Unit, onSave: (Acco
         confirmButton = {
             TextButton(
                 enabled = name.isNotBlank() && openingValue != null,
-                onClick = { onSave(account.copy(name = name.trim(), type = type, opening = openingValue ?: 0)); onDismiss() },
+                onClick = { onSave(account.copy(name = name.trim(), type = type, opening = openingValue ?: 0, bookId = bookId)); onDismiss() },
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {

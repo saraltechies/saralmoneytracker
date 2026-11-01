@@ -82,6 +82,7 @@ import com.saraltechies.saralmoneytracker.data.LoanItem
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.SettingsRepository
 import com.saraltechies.saralmoneytracker.model.Account
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanEvent
 import com.saraltechies.saralmoneytracker.model.LoanEventKind
@@ -123,13 +124,14 @@ fun LoanDetailScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val item by remember { repository.watch { repository.loanItem(loanId) } }.collectAsStateWithLifecycle(null)
-    val accounts by remember { repository.watch { repository.accounts(includeArchived = true, includeLoans = false) } }.collectAsStateWithLifecycle(emptyList())
+    val accounts by remember { repository.watch { repository.accounts(includeArchived = true, includeLoans = false, book = Books.ALL) } }.collectAsStateWithLifecycle(emptyList())
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var entry by remember { mutableStateOf<EntryMode?>(null) }
     var showPlan by rememberSaveable { mutableStateOf(false) }
     var statement by rememberSaveable { mutableStateOf(false) }
-    val me by remember { repository.watch { repository.myDetails() } }.collectAsStateWithLifecycle(null)
+    // Your details for the loan's book: a business loan's statement shows the business.
+    val me by remember { repository.watch { repository.loanItem(loanId)?.let { repository.myDetails(it.loan.bookId) } } }.collectAsStateWithLifecycle(null)
     val currency = LocalCurrency.current
 
     Scaffold(

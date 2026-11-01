@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
@@ -106,6 +107,7 @@ fun SettingsScreen(
     onCategories: () -> Unit,
     onMyDetails: () -> Unit,
     onLoans: () -> Unit,
+    onBooks: () -> Unit,
     onRecurring: () -> Unit,
     onImport: () -> Unit,
 ) {
@@ -178,6 +180,7 @@ fun SettingsScreen(
 
             item { SectionTitle(stringResource(R.string.settings_organise)) }
             item { Setting(Icons.Filled.Category, stringResource(R.string.categories), stringResource(R.string.categories_summary), onClick = onCategories) }
+            item { Setting(Icons.Filled.Store, stringResource(R.string.books_title), stringResource(R.string.books_summary), onClick = onBooks) }
             item { Setting(Icons.Filled.Handshake, stringResource(R.string.loans_title), stringResource(R.string.loans_row_empty), onClick = onLoans) }
             item { Setting(Icons.Filled.Badge, stringResource(R.string.my_details), stringResource(R.string.my_details_summary), onClick = onMyDetails) }
             item { Setting(Icons.Filled.Repeat, stringResource(R.string.repeating_entries), stringResource(R.string.repeating_summary), onClick = onRecurring) }

@@ -8,7 +8,7 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=com.saraltechies.saralmoneytracker)
 -->
 
-## Features (1.2)
+## Features (1.3)
 
 - **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), your most used categories first (with **More**
   and a search for the rest), today/yesterday chips, and
@@ -36,6 +36,12 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   with no contacts permission). Add **your details** once, and send a PDF statement: both parties, terms, a summary, every
   entry with the running balance, the EMI plan, and how to pay with a UPI scan-to-pay code. Whole loan, a financial year
   or any dates; share it (the email is filled in for mail apps) or save it.
+- **Personal and business books**: keep a business (or several) apart from your own money, each with its own accounts,
+  categories, budgets, loans and details; switch from the top of Home or see all books together. A business bill paid from a
+  personal account counts as a business expense; money moved between books shows as capital put in or drawings, never
+  income or spending. A business book starts with business categories (sales, purchases, rent, salaries, GST…).
+- **Profit and loss report** (PDF) for a business, or income and expenses for a personal book: by category, profit,
+  capital and drawings, account balances and loans, for any period or financial year.
 - **Search** every note and category; filter by expense, income or transfer.
 - **Excel import**: bring in a hand-made tracker (monthly "Money Out / Money In" sheets), any table with Date and Amount
   columns, or a bank statement with Debit/Credit columns. Copied rows are skipped, "Credit Card" bill payments can be turned

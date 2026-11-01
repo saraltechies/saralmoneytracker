@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.2.0. Re-check before each release.
+Every claim below matches the code as of 1.3.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -47,6 +47,13 @@ LENT AND BORROWED MONEY
 • Full details for each person, bank or vendor: phone, email, address, PAN/GSTIN, bank and UPI
 • Send a PDF loan statement with the running balance, EMI plan and a UPI scan-to-pay code
 • A reminder on the day a payment is due
+
+PERSONAL AND BUSINESS, KEPT APART
+• Run a shop or a business? Keep its money in its own book, apart from yours
+• Each book has its own accounts, categories, budgets and loans; switch in one tap
+• A business bill paid from your personal account still counts as a business expense
+• Money you put in or take out is capital or drawings, never income or spending
+• Profit and loss report as a PDF, by month or financial year, for you, your accountant or bank
 
 REPEATING ENTRIES
 • Add salary, rent, EMIs, SIPs and subscriptions once

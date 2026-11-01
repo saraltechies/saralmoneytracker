@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,6 +23,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -40,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.PeriodKind
 import com.saraltechies.saralmoneytracker.model.Periods
 import com.saraltechies.saralmoneytracker.model.Stats
@@ -75,23 +79,31 @@ fun StatsScreen(
     repository: MoneyRepository,
     bottomBar: @Composable () -> Unit,
     onOpenCategory: (Long) -> Unit,
+    onMyDetails: () -> Unit,
 ) {
     val prefs = LocalPeriodPrefs.current
     var period by rememberPeriod(PeriodKind.MONTH)
     var type by rememberSaveable { mutableStateOf(TxnType.EXPENSE) }
+    var report by rememberSaveable { mutableStateOf(false) }
     val data by remember(period) {
         repository.watch {
             val previous = Periods.shift(period, -1, prefs)
             StatsData(
-                repository.txns(period.start, period.end),
-                repository.txns(previous.start, previous.end),
-                Lookups(repository.categories(true), repository.accounts(true)),
+                repository.txns(period.start, period.end, profitAndLoss = true),
+                repository.txns(previous.start, previous.end, profitAndLoss = true),
+                Lookups(repository.categories(true, book = Books.ALL), repository.accounts(true, book = Books.ALL), repository.loanDirections(), repository.books()),
             )
         }
     }.collectAsStateWithLifecycle(null)
 
+    if (report) ReportDialog(repository, period, onMyDetails = { report = false; onMyDetails() }, onDismiss = { report = false })
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.tab_stats)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.tab_stats)) },
+                actions = { IconButton(onClick = { report = true }) { Icon(Icons.Filled.PictureAsPdf, stringResource(R.string.report_action)) } },
+            )
+        },
         bottomBar = bottomBar,
     ) { padding ->
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp)) {

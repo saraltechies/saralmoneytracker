@@ -61,10 +61,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.DefaultData
 import com.saraltechies.saralmoneytracker.model.TxnType
+import com.saraltechies.saralmoneytracker.ui.components.BookChips
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
+import com.saraltechies.saralmoneytracker.ui.components.LocalBooks
 import com.saraltechies.saralmoneytracker.ui.components.IconBadge
 import com.saraltechies.saralmoneytracker.ui.components.money
 import com.saraltechies.saralmoneytracker.ui.components.typeLabel
@@ -76,9 +79,12 @@ fun CategoriesScreen(repository: MoneyRepository, snackbar: SnackbarHostState, o
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var kind by rememberSaveable { mutableStateOf(TxnType.EXPENSE) }
-    val categories by remember { repository.watch { repository.categories() } }.collectAsStateWithLifecycle(emptyList())
+    // Each book has its own categories; the book on screen (or the first, when showing all) is the one managed.
+    val books = LocalBooks.current
+    var bookId by rememberSaveable { mutableStateOf(books.defaultBook) }
+    val categories by remember { repository.watch { repository.categories(book = Books.ALL) } }.collectAsStateWithLifecycle(emptyList())
     var editing by remember { mutableStateOf<Category?>(null) }
-    val shown = categories.filter { it.kind == kind }
+    val shown = categories.filter { it.kind == kind && it.bookId == bookId }
 
     Scaffold(
         topBar = {
@@ -90,13 +96,14 @@ fun CategoriesScreen(repository: MoneyRepository, snackbar: SnackbarHostState, o
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { editing = Category(name = "", kind = kind, icon = "other", color = DefaultData.palette[shown.size % DefaultData.palette.size]) },
+                onClick = { editing = Category(name = "", kind = kind, icon = "other", color = DefaultData.palette[shown.size % DefaultData.palette.size], bookId = bookId) },
                 icon = { Icon(Icons.Filled.Add, null) },
                 text = { Text(stringResource(R.string.add_category)) },
             )
         },
     ) { padding ->
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 88.dp)) {
+            item { BookChips(bookId, onSelect = { bookId = it }, modifier = Modifier.padding(top = 4.dp)) }
             item {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                     listOf(TxnType.EXPENSE, TxnType.INCOME).forEachIndexed { i, t ->

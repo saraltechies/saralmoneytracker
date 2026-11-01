@@ -2,6 +2,9 @@ package com.saraltechies.saralmoneytracker.xlsx
 
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Book
+import com.saraltechies.saralmoneytracker.model.BookKind
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
@@ -31,8 +34,9 @@ object BackupFormat {
     const val SHEET_RECURRING = "Recurring"
     const val SHEET_LOANS = "Loans"
     const val SHEET_CONTACTS = "Contacts"
+    const val SHEET_BOOKS = "Books"
 
-    private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note", "Loan")
+    private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note", "Loan", "Book")
 
     fun isBackupHeader(sheet: XSheet): Boolean {
         val header = sheet.rows[0]?.values?.map { it.text.trim().lowercase(Locale.ROOT) }.orEmpty()
@@ -46,12 +50,16 @@ object BackupFormat {
         val recurring: List<Recurring>,
         val loans: List<Loan> = emptyList(),
         val contacts: List<Contact> = emptyList(),
+        val books: List<Book> = emptyList(),
     )
 
     fun writeXlsx(data: Data, out: OutputStream, exportedOn: LocalDate, appVersion: String) {
         val acc = data.accounts.associateBy { it.id }
         val cat = data.categories.associateBy { it.id }
         val loanAccounts = data.loans.associate { it.id to acc[it.accountId]?.name.orEmpty() }
+        val bookNames = data.books.associate { it.id to it.name }
+        fun bookOf(id: Long) = if (data.books.size > 1) bookNames[id].orEmpty() else ""
+        fun txBook(t: Txn) = bookOf(t.categoryId?.let { cat[it]?.bookId } ?: acc[t.accountId]?.bookId ?: Books.PERSONAL_ID)
         fun loanName(t: Txn) = t.loanId?.let { loanAccounts[it] }.orEmpty()
         val w = XlsxWriter()
         w.sheet(
@@ -59,39 +67,41 @@ object BackupFormat {
             listOf(TX_HEADER) + data.txns.sortedWith(compareBy({ it.date }, { it.createdAt })).map { t ->
                 listOf(
                     t.date, typeName(t.type), MoneyCell(t.amount), t.categoryId?.let { cat[it]?.name }.orEmpty(),
-                    acc[t.accountId]?.name.orEmpty(), t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t),
+                    acc[t.accountId]?.name.orEmpty(), t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t), txBook(t),
                 )
             },
-            widths = listOf(14, 10, 14, 22, 18, 18, 40, 18),
+            widths = listOf(14, 10, 14, 22, 18, 18, 40, 18, 16),
         )
         w.sheet(
             SHEET_ACCOUNTS,
-            listOf(listOf("Name", "Type", "Opening balance", "Hidden")) + data.accounts.map {
-                listOf(it.name, accountTypeName(it.type), MoneyCell(it.opening), if (it.archived) "Yes" else "")
+            listOf(listOf("Name", "Type", "Opening balance", "Hidden", "Book")) + data.accounts.map {
+                listOf(it.name, accountTypeName(it.type), MoneyCell(it.opening), if (it.archived) "Yes" else "", bookOf(it.bookId))
             },
-            widths = listOf(24, 10, 16, 8),
+            widths = listOf(24, 10, 16, 8, 16),
         )
         w.sheet(
             SHEET_CATEGORIES,
-            listOf(listOf("Name", "Kind", "Monthly budget", "Icon", "Colour", "Hidden")) + data.categories.map {
+            listOf(listOf("Name", "Kind", "Monthly budget", "Icon", "Colour", "Hidden", "Book")) + data.categories.map {
                 listOf(
                     it.name, typeName(it.kind), it.budget?.let(::MoneyCell), it.icon,
                     "#" + Integer.toHexString(it.color).uppercase(Locale.ROOT).padStart(8, '0'), if (it.archived) "Yes" else "",
+                    bookOf(it.bookId),
                 )
             },
-            widths = listOf(24, 10, 16, 12, 12, 8),
+            widths = listOf(24, 10, 16, 12, 12, 8, 16),
         )
         w.sheet(
             SHEET_RECURRING,
-            listOf(listOf("Type", "Amount", "Category", "Account", "To account", "Note", "Repeat", "Start date", "Next date", "End date", "Paused")) +
+            listOf(listOf("Type", "Amount", "Category", "Account", "To account", "Note", "Repeat", "Start date", "Next date", "End date", "Paused", "Book")) +
                 data.recurring.map { r ->
                     listOf(
                         typeName(r.type), MoneyCell(r.amount), r.categoryId?.let { cat[it]?.name }.orEmpty(),
                         acc[r.accountId]?.name.orEmpty(), r.toAccountId?.let { acc[it]?.name }.orEmpty(), r.note,
                         frequencyName(r.frequency), r.startDate, r.nextDate, r.endDate, if (r.active) "" else "Yes",
+                        bookOf(r.categoryId?.let { cat[it]?.bookId } ?: acc[r.accountId]?.bookId ?: Books.PERSONAL_ID),
                     )
                 },
-            widths = listOf(10, 14, 22, 18, 18, 30, 10, 14, 14, 14, 8),
+            widths = listOf(10, 14, 22, 18, 18, 30, 10, 14, 14, 14, 8, 16),
         )
         // Contacts are linked by name, so two with the same name get "Ravi" and "Ravi (2)".
         val contactNames = HashMap<Long, String>()
@@ -104,28 +114,31 @@ object BackupFormat {
         }
         w.sheet(
             SHEET_CONTACTS,
-            listOf(listOf("Name", "Type", "Phone", "Email", "Address", "PAN / GSTIN", "Bank", "Account number", "IFSC", "UPI ID", "Reference", "Note")) +
+            listOf(listOf("Name", "Type", "Phone", "Email", "Address", "PAN / GSTIN", "Bank", "Account number", "IFSC", "UPI ID", "Reference", "Note", "Book")) +
                 data.contacts.map { c ->
                     listOf(
                         contactNames[c.id].orEmpty(), contactKindName(c.kind), c.phone, c.email, c.address, c.taxId, c.bankName,
-                        c.bankAccount, c.ifsc, c.upi, c.reference, c.note,
+                        c.bankAccount, c.ifsc, c.upi, c.reference, c.note, if (c.kind == ContactKind.SELF) bookOf(c.bookId) else "",
                     )
                 },
-            widths = listOf(22, 10, 16, 26, 36, 18, 18, 20, 14, 22, 18, 30),
+            widths = listOf(22, 10, 16, 26, 36, 18, 18, 20, 14, 22, 18, 30, 16),
         )
         w.sheet(
             SHEET_LOANS,
-            listOf(listOf("Name", "Direction", "Start date", "Interest %", "Rate per", "Plan", "Instalments", "Instalment amount", "Note", "Closed", "Contact")) +
+            listOf(listOf("Name", "Direction", "Start date", "Interest %", "Rate per", "Plan", "Instalments", "Instalment amount", "Note", "Closed", "Contact", "Book")) +
                 data.loans.map { l ->
                     listOf(
                         loanAccounts[l.id].orEmpty(), directionName(l.direction), l.startDate,
                         java.math.BigDecimal.valueOf(l.rate, 2).stripTrailingZeros().toPlainString(), rateUnitName(l.rateUnit), planName(l.plan),
                         if (l.plan == LoanPlan.MONTHLY) l.installments.toString() else "", if (l.plan == LoanPlan.MONTHLY) MoneyCell(l.installment) else null,
-                        l.note, if (l.closed) "Yes" else "", l.contactId?.let { contactNames[it] }.orEmpty(),
+                        l.note, if (l.closed) "Yes" else "", l.contactId?.let { contactNames[it] }.orEmpty(), bookOf(l.bookId),
                     )
                 },
-            widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8, 22),
+            widths = listOf(22, 10, 14, 10, 10, 10, 12, 16, 30, 8, 22, 16),
         )
+        if (data.books.size > 1) {
+            w.sheet(SHEET_BOOKS, listOf(listOf("Name", "Type")) + data.books.map { listOf(it.name, bookKindName(it.kind)) }, widths = listOf(24, 12))
+        }
         w.sheet(
             "About",
             listOf(
@@ -144,13 +157,16 @@ object BackupFormat {
         val acc = data.accounts.associateBy { it.id }
         val cat = data.categories.associateBy { it.id }
         val loanAccounts = data.loans.associate { it.id to acc[it.accountId]?.name.orEmpty() }
+        val bookNames = data.books.associate { it.id to it.name }
+        fun bookOf(id: Long) = if (data.books.size > 1) bookNames[id].orEmpty() else ""
+        fun txBook(t: Txn) = bookOf(t.categoryId?.let { cat[it]?.bookId } ?: acc[t.accountId]?.bookId ?: Books.PERSONAL_ID)
         fun loanName(t: Txn) = t.loanId?.let { loanAccounts[it] }.orEmpty()
         out.write(TX_HEADER.joinToString(",") + "\r\n")
         for (t in data.txns.sortedWith(compareBy({ it.date }, { it.createdAt }))) {
             val fields = listOf(
                 t.date.toString(), typeName(t.type), java.math.BigDecimal.valueOf(t.amount, 2).toPlainString(),
                 t.categoryId?.let { cat[it]?.name }.orEmpty(), acc[t.accountId]?.name.orEmpty(),
-                t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t),
+                t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t), txBook(t),
             )
             out.write(fields.joinToString(",") { csv(it) } + "\r\n")
         }
@@ -227,4 +243,11 @@ object BackupFormat {
     }
 
     fun parseContactKind(text: String): ContactKind = ContactKind.entries.firstOrNull { contactKindName(it).equals(text.trim(), true) } ?: ContactKind.PERSON
+
+    fun bookKindName(k: BookKind) = when (k) {
+        BookKind.PERSONAL -> "Personal"
+        BookKind.BUSINESS -> "Business"
+    }
+
+    fun parseBookKind(text: String): BookKind = if (text.trim().equals("business", true)) BookKind.BUSINESS else BookKind.PERSONAL
 }

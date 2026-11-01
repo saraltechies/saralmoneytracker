@@ -162,12 +162,12 @@ private fun readPhoneContact(context: Context, uri: Uri): Pair<String, String>? 
 
 /** Keeps a contact being edited across rotation and process death. */
 val ContactSaver = androidx.compose.runtime.saveable.Saver<Contact, List<Any>>(
-    save = { listOf(it.id, it.name, it.kind.name, it.phone, it.email, it.address, it.taxId, it.bankName, it.bankAccount, it.ifsc, it.upi, it.reference, it.note) },
+    save = { listOf(it.id, it.name, it.kind.name, it.phone, it.email, it.address, it.taxId, it.bankName, it.bankAccount, it.ifsc, it.upi, it.reference, it.note, it.bookId) },
     restore = {
         Contact(
             id = it[0] as Long, name = it[1] as String, kind = ContactKind.valueOf(it[2] as String), phone = it[3] as String, email = it[4] as String,
             address = it[5] as String, taxId = it[6] as String, bankName = it[7] as String, bankAccount = it[8] as String, ifsc = it[9] as String,
-            upi = it[10] as String, reference = it[11] as String, note = it[12] as String,
+            upi = it[10] as String, reference = it[11] as String, note = it[12] as String, bookId = it[13] as Long,
         )
     },
 )

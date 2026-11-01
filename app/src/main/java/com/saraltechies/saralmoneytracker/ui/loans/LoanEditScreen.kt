@@ -59,8 +59,11 @@ import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.Money
 import com.saraltechies.saralmoneytracker.model.RateUnit
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Contact
+import com.saraltechies.saralmoneytracker.ui.components.BookChips
 import com.saraltechies.saralmoneytracker.ui.components.CategoryIcons
+import com.saraltechies.saralmoneytracker.ui.components.LocalBooks
 import com.saraltechies.saralmoneytracker.ui.contacts.ContactFields
 import com.saraltechies.saralmoneytracker.ui.contacts.ContactSaver
 import com.saraltechies.saralmoneytracker.ui.components.ChoiceDialog
@@ -86,12 +89,14 @@ fun LoanEditScreen(
     onSaved: (Long) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val accounts by remember { repository.watch { repository.accounts() } }.collectAsStateWithLifecycle(emptyList())
+    val accounts by remember { repository.watch { repository.accounts(book = Books.ALL) } }.collectAsStateWithLifecycle(emptyList())
     var existing by remember { mutableStateOf<LoanItem?>(null) }
     var loaded by rememberSaveable { mutableStateOf(loanId == 0L) }
     var direction by rememberSaveable { mutableStateOf(initialDirection) }
     var contact by rememberSaveable(stateSaver = ContactSaver) { mutableStateOf(Contact(name = "")) }
     var pickSaved by remember { mutableStateOf(false) }
+    val books = LocalBooks.current
+    var bookId by rememberSaveable { mutableStateOf(books.defaultBook) }
     val savedContacts by remember { repository.watch { repository.contacts() } }.collectAsStateWithLifecycle(emptyList())
     var amountText by rememberSaveable { mutableStateOf("") }
     var dateDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
@@ -119,6 +124,7 @@ fun LoanEditScreen(
         val l = item.loan
         direction = l.direction
         contact = item.contact ?: Contact(name = item.name)
+        bookId = l.bookId
         dateDay = l.startDate.toEpochDay()
         withInterest = l.rate > 0
         rateText = if (l.rate > 0) ratePlain(l.rate) else ""
@@ -131,7 +137,7 @@ fun LoanEditScreen(
         loaded = true
     }
     LaunchedEffect(accounts) {
-        if (accountId == 0L && accounts.isNotEmpty()) accountId = accounts.first().id
+        if (accountId == 0L && accounts.isNotEmpty()) accountId = (accounts.firstOrNull { it.bookId == bookId } ?: accounts.first()).id
     }
 
     val principal = if (isNew) Money.parse(amountText) else existing?.summary?.given
@@ -157,7 +163,7 @@ fun LoanEditScreen(
         val terms = LoanTerms(
             name = contact.name.trim(), direction = direction, startDate = date, rate = rate, rateUnit = rateUnit,
             plan = if (monthly) LoanPlan.MONTHLY else LoanPlan.FLEXIBLE,
-            installments = if (monthly) months else 0, installment = if (monthly) installment else 0, note = note,
+            installments = if (monthly) months else 0, installment = if (monthly) installment else 0, note = note, bookId = bookId,
         )
         scope.launch {
             val item = existing
@@ -193,6 +199,7 @@ fun LoanEditScreen(
                         ) { Text(stringResource(label), maxLines = 1) }
                     }
                 }
+                BookChips(bookId, onSelect = { bookId = it }, modifier = Modifier.padding(top = 8.dp))
                 Text(
                     stringResource(if (lent) R.string.loan_gave_hint else R.string.loan_took_hint),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -344,12 +351,12 @@ fun LoanEditScreen(
     if (pickDate) DatePickDialog(date, onDismiss = { pickDate = false }, onPick = { dateDay = it.toEpochDay() })
     if (pickAccount) {
         val none = Account(id = -1, name = stringResource(R.string.loan_not_from_accounts), type = com.saraltechies.saralmoneytracker.model.AccountType.OTHER)
-        val options = accounts + none
+        val options = accounts.sortedBy { if (it.bookId == bookId) 0 else 1 } + none
         ChoiceDialog(
             title = stringResource(if (lent) R.string.paid_from else R.string.received_in),
             options = options,
             selected = options.firstOrNull { it.id == accountId },
-            label = { it.name },
+            label = { a -> if (books.multiple && a.id != -1L) a.name + " · " + books.book(a.bookId)?.name.orEmpty() else a.name },
             leading = { IconBadge(if (it.id == -1L) Icons.Filled.Person else CategoryIcons.account(it.type), MaterialTheme.colorScheme.primary, size = 32.dp) },
             onPick = { accountId = it.id },
             onDismiss = { pickAccount = false },

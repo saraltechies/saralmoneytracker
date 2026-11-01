@@ -3,6 +3,7 @@ package com.saraltechies.saralmoneytracker.data
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_ACCOUNTS
+import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_BOOKS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_CATEGORIES
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_CONTACTS
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_LOANS
@@ -10,6 +11,9 @@ import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_RECURRING
 import com.saraltechies.saralmoneytracker.data.MoneyDb.Companion.T_TXNS
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Book
+import com.saraltechies.saralmoneytracker.model.BookKind
+import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
@@ -20,7 +24,9 @@ import com.saraltechies.saralmoneytracker.model.LoanEventKind
 import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanSummary
 import com.saraltechies.saralmoneytracker.model.LoanEvent
+import com.saraltechies.saralmoneytracker.model.BookReport
 import com.saraltechies.saralmoneytracker.model.Recurrence
+import com.saraltechies.saralmoneytracker.model.Reports
 import com.saraltechies.saralmoneytracker.model.Recurring
 import com.saraltechies.saralmoneytracker.model.Stats
 import com.saraltechies.saralmoneytracker.model.Txn
@@ -29,6 +35,8 @@ import com.saraltechies.saralmoneytracker.xlsx.BackupFormat
 import com.saraltechies.saralmoneytracker.xlsx.ImportResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -46,6 +54,8 @@ data class ImportOptions(
     val cardAccountName: String,
     val otherExpenseName: String,
     val otherIncomeName: String,
+    /** The book for anything the file doesn't place in a book of its own. */
+    val bookId: Long = Books.PERSONAL_ID,
 )
 
 /** A loan as the screens show it: the person's name, its history and where it stands. */
@@ -70,6 +80,7 @@ data class LoanTerms(
     val installments: Int,
     val installment: Long,
     val note: String,
+    val bookId: Long = Books.PERSONAL_ID,
 )
 
 data class ImportReport(val added: Int, val duplicates: Int, val transfers: Int, val categoriesAdded: Int, val accountsAdded: Int, val budgetsSet: Int, val recurringAdded: Int)
@@ -83,7 +94,85 @@ class MoneyRepository(private val context: Context) {
     private val db = MoneyDb(context)
     private val version = MutableStateFlow(0L)
 
-    fun <T> watch(read: () -> T): Flow<T> = version.map { withContext(Dispatchers.IO) { read() } }
+    /**
+     * The book the screens show: one book's id, or [Books.ALL]. Reads that take `book: Long? = null` follow it;
+     * pass [Books.ALL] for every book (names in lists, balances, backups).
+     */
+    private val scope = MutableStateFlow(Books.ALL)
+    val currentBook: StateFlow<Long> = scope
+
+    fun setBook(id: Long) {
+        scope.value = id
+    }
+
+    private fun resolve(book: Long?): Long = book ?: scope.value
+
+    /** The book new accounts, categories and loans go to: the one on screen, or Personal when showing all. */
+    fun defaultBook(): Long = scope.value.takeIf { it != Books.ALL } ?: Books.PERSONAL_ID
+
+    /** Re-runs [read] on a background thread after every change and whenever the book on screen changes. */
+    fun <T> watch(read: () -> T): Flow<T> = combine(version, scope) { _, _ -> withContext(Dispatchers.IO) { read() } }
+
+    private fun accountsIn(book: Long) = "SELECT id FROM $T_ACCOUNTS WHERE book_id = $book"
+    private fun categoriesIn(book: Long) = "SELECT id FROM $T_CATEGORIES WHERE book_id = $book"
+
+    // ---- Books --------------------------------------------------------------------------------------------
+
+    fun books(): List<Book> = db.readableDatabase.query(T_BOOKS, null, null, null, null, null, "sort, id")
+        .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.book(c)) } }
+
+    /**
+     * Adds a book. A business book starts with business categories (sales, purchases, rent, salaries…) and a
+     * business cash and bank account; a personal one with the usual personal ones.
+     */
+    suspend fun createBook(name: String, kind: BookKind): Long = write { w ->
+        val sort = w.rawQuery("SELECT COALESCE(MAX(sort), 0) + 1 FROM $T_BOOKS", null).use { it.moveToFirst(); it.getInt(0) }
+        val id = w.insert(T_BOOKS, null, MoneyDb.values(Book(name = name.trim(), kind = kind, sort = sort)))
+        val res = context.resources
+        if (kind == BookKind.BUSINESS) {
+            val labels = DefaultData.BusinessLabels(
+                expense = res.getStringArray(com.saraltechies.saralmoneytracker.R.array.default_business_expense_categories).toList(),
+                income = res.getStringArray(com.saraltechies.saralmoneytracker.R.array.default_business_income_categories).toList(),
+                cash = res.getString(com.saraltechies.saralmoneytracker.R.string.default_business_cash),
+                bank = res.getString(com.saraltechies.saralmoneytracker.R.string.default_business_bank),
+            )
+            DefaultData.businessAccounts(labels, id).forEach { w.insert(T_ACCOUNTS, null, MoneyDb.values(it.copy(name = uniqueAccountName(w, it.name, null)))) }
+            DefaultData.businessCategories(labels, id).forEach { w.insert(T_CATEGORIES, null, MoneyDb.values(it)) }
+        } else {
+            val labels = DefaultData.Labels(
+                expense = res.getStringArray(com.saraltechies.saralmoneytracker.R.array.default_expense_categories).toList(),
+                income = res.getStringArray(com.saraltechies.saralmoneytracker.R.array.default_income_categories).toList(),
+                cash = res.getString(com.saraltechies.saralmoneytracker.R.string.default_account_cash),
+                bank = res.getString(com.saraltechies.saralmoneytracker.R.string.default_account_bank),
+            )
+            DefaultData.accounts(labels).forEach { w.insert(T_ACCOUNTS, null, MoneyDb.values(it.copy(bookId = id, name = uniqueAccountName(w, "${it.name} (${name.trim()})", null)))) }
+            DefaultData.categories(labels).forEach { w.insert(T_CATEGORIES, null, MoneyDb.values(it.copy(bookId = id))) }
+        }
+        id
+    }
+
+    suspend fun renameBook(id: Long, name: String, kind: BookKind) = write { w ->
+        w.execSQL("UPDATE $T_BOOKS SET name = ?, kind = ? WHERE id = ?", arrayOf<Any?>(name.trim(), kind.name, id))
+    }
+
+    /** True when the book has entries, repeating entries or loans, so deleting it would lose history. */
+    fun bookHasHistory(id: Long): Boolean = db.readableDatabase.rawQuery(
+        """SELECT 1 FROM $T_TXNS WHERE account_id IN (${accountsIn(id)}) OR to_account_id IN (${accountsIn(id)}) OR category_id IN (${categoriesIn(id)})
+           UNION SELECT 1 FROM $T_RECURRING WHERE account_id IN (${accountsIn(id)}) OR category_id IN (${categoriesIn(id)})
+           UNION SELECT 1 FROM $T_LOANS WHERE book_id = $id LIMIT 1""",
+        null,
+    ).use { it.moveToFirst() }
+
+    /** Deletes a book that has no history, with its accounts, categories and details. The Personal book stays. */
+    suspend fun deleteBook(id: Long): Boolean {
+        if (id == Books.PERSONAL_ID || withContext(Dispatchers.IO) { bookHasHistory(id) }) return false
+        write { w ->
+            for (table in listOf(T_ACCOUNTS, T_CATEGORIES, T_CONTACTS)) w.delete(table, "book_id = ?", arrayOf(id.toString()))
+            w.delete(T_BOOKS, "id = ?", arrayOf(id.toString()))
+        }
+        if (scope.value == id) scope.value = Books.ALL
+        return true
+    }
 
     private fun changed() = version.update { it + 1 }
 
@@ -103,20 +192,31 @@ class MoneyRepository(private val context: Context) {
      * Your accounts. Loan accounts (one per [Loan]) are left out unless [includeLoans]: they belong on the Loans
      * screen, not in account pickers. Lookups for showing names pass `true` for both.
      */
-    fun accounts(includeArchived: Boolean = false, includeLoans: Boolean = includeArchived): List<Account> {
+    fun accounts(includeArchived: Boolean = false, includeLoans: Boolean = includeArchived, book: Long? = null): List<Account> {
+        val b = resolve(book)
         val where = listOfNotNull(
             if (includeArchived) null else "archived = 0",
             if (includeLoans) null else "type != '${AccountType.LOAN.name}'",
+            if (b == Books.ALL) null else "book_id = $b",
         ).joinToString(" AND ").ifEmpty { null }
-        return db.readableDatabase.query(T_ACCOUNTS, null, where, null, null, null, "sort, id")
+        return db.readableDatabase.query(T_ACCOUNTS, null, where, null, null, null, "book_id, sort, id")
             .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.account(c)) } }
     }
 
-    fun categories(includeArchived: Boolean = false): List<Category> = db.readableDatabase.query(
-        T_CATEGORIES, null, if (includeArchived) null else "archived = 0", null, null, null, "sort, id",
-    ).use { c -> buildList { while (c.moveToNext()) add(MoneyDb.category(c)) } }
+    fun categories(includeArchived: Boolean = false, book: Long? = null): List<Category> {
+        val b = resolve(book)
+        val where = listOfNotNull(if (includeArchived) null else "archived = 0", if (b == Books.ALL) null else "book_id = $b")
+            .joinToString(" AND ").ifEmpty { null }
+        return db.readableDatabase.query(T_CATEGORIES, null, where, null, null, null, "book_id, sort, id")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.category(c)) } }
+    }
 
-    /** Newest first. [query] matches the note or the category name. */
+    /**
+     * Newest first. [query] matches the note or the category name.
+     *
+     * With a book, entries that touch it: its categories, or money in or out of its accounts. With [profitAndLoss],
+     * only the income and expenses that count in the book (by category), for totals, charts and budgets.
+     */
     fun txns(
         from: LocalDate? = null,
         to: LocalDate? = null,
@@ -124,16 +224,24 @@ class MoneyRepository(private val context: Context) {
         categoryId: Long? = null,
         query: String? = null,
         limit: Int? = null,
+        book: Long? = null,
+        profitAndLoss: Boolean = false,
     ): List<Txn> {
         val where = mutableListOf<String>()
         val args = mutableListOf<String>()
+        val b = resolve(book)
+        when {
+            profitAndLoss && b == Books.ALL -> where += "type != '${TxnType.TRANSFER.name}'"
+            profitAndLoss -> where += "type != '${TxnType.TRANSFER.name}' AND category_id IN (${categoriesIn(b)})"
+            b != Books.ALL -> where += "(category_id IN (${categoriesIn(b)}) OR account_id IN (${accountsIn(b)}) OR to_account_id IN (${accountsIn(b)}))"
+        }
         from?.let { where += "day >= ?"; args += it.toEpochDay().toString() }
         to?.let { where += "day <= ?"; args += it.toEpochDay().toString() }
         accountId?.let { where += "(account_id = ? OR to_account_id = ?)"; args += it.toString(); args += it.toString() }
         categoryId?.let { where += "category_id = ?"; args += it.toString() }
         if (!query.isNullOrBlank()) {
             val q = query.trim()
-            val catIds = categories(includeArchived = true).filter { it.name.contains(q, ignoreCase = true) }.map { it.id }
+            val catIds = categories(includeArchived = true, book = Books.ALL).filter { it.name.contains(q, ignoreCase = true) }.map { it.id }
             val catClause = if (catIds.isEmpty()) "" else " OR category_id IN (${catIds.joinToString(",")})"
             where += "(note LIKE ? ESCAPE '\\'$catClause)"
             args += "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
@@ -147,16 +255,25 @@ class MoneyRepository(private val context: Context) {
     fun txn(id: Long): Txn? = db.readableDatabase.query(T_TXNS, null, "id = ?", arrayOf(id.toString()), null, null, null)
         .use { c -> if (c.moveToFirst()) MoneyDb.txn(c) else null }
 
-    fun recurring(): List<Recurring> = db.readableDatabase.query(T_RECURRING, null, null, null, null, null, "active DESC, next_day")
-        .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.recurring(c)) } }
+    fun recurring(book: Long? = null): List<Recurring> {
+        val b = resolve(book)
+        val where = if (b == Books.ALL) null
+        else "(category_id IN (${categoriesIn(b)}) OR account_id IN (${accountsIn(b)}) OR to_account_id IN (${accountsIn(b)}))"
+        return db.readableDatabase.query(T_RECURRING, null, where, null, null, null, "active DESC, next_day")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.recurring(c)) } }
+    }
 
     fun recurringRule(id: Long): Recurring? = db.readableDatabase.query(T_RECURRING, null, "id = ?", arrayOf(id.toString()), null, null, null)
         .use { c -> if (c.moveToFirst()) MoneyDb.recurring(c) else null }
 
     /** Current balance of every account, hidden ones included. */
-    fun balances(): Map<Long, Long> = Stats.balances(accounts(includeArchived = true), txns())
+    fun balances(): Map<Long, Long> = Stats.balances(accounts(includeArchived = true, book = Books.ALL), txns(book = Books.ALL))
 
-    fun txnCount(): Int = db.readableDatabase.rawQuery("SELECT COUNT(*) FROM $T_TXNS", null).use { it.moveToFirst(); it.getInt(0) }
+    fun txnCount(book: Long? = null): Int {
+        val b = resolve(book)
+        val where = if (b == Books.ALL) "" else " WHERE category_id IN (${categoriesIn(b)}) OR account_id IN (${accountsIn(b)}) OR to_account_id IN (${accountsIn(b)})"
+        return db.readableDatabase.rawQuery("SELECT COUNT(*) FROM $T_TXNS$where", null).use { it.moveToFirst(); it.getInt(0) }
+    }
 
     fun hasTxnOn(day: LocalDate): Boolean = db.readableDatabase.rawQuery(
         "SELECT 1 FROM $T_TXNS WHERE day = ? AND type != ? LIMIT 1", arrayOf(day.toEpochDay().toString(), TxnType.TRANSFER.name),
@@ -172,7 +289,10 @@ class MoneyRepository(private val context: Context) {
         arrayOf(categoryId.toString()),
     ).use { it.moveToFirst() }
 
-    fun exportData() = BackupFormat.Data(accounts(true), categories(true), txns(), recurring(), loans(), contacts(includeSelf = true))
+    fun exportData() = BackupFormat.Data(
+        accounts(true, book = Books.ALL), categories(true, book = Books.ALL), txns(book = Books.ALL), recurring(book = Books.ALL),
+        loans(book = Books.ALL), contacts(includeSelf = true), books(),
+    )
 
     /** How often each category was used since [since], to put the usual ones first when adding an entry. */
     fun categoryUsage(type: TxnType, since: LocalDate): Map<Long, Int> = db.readableDatabase.rawQuery(
@@ -182,20 +302,23 @@ class MoneyRepository(private val context: Context) {
 
     // ---- Loans --------------------------------------------------------------------------------------------
 
-    fun loans(): List<Loan> = db.readableDatabase.query(T_LOANS, null, null, null, null, null, "closed, start_day DESC, id DESC")
-        .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.loan(c)) } }
+    fun loans(book: Long? = null): List<Loan> {
+        val b = resolve(book)
+        return db.readableDatabase.query(T_LOANS, null, if (b == Books.ALL) null else "book_id = $b", null, null, null, "closed, start_day DESC, id DESC")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.loan(c)) } }
+    }
 
     fun loan(id: Long): Loan? = db.readableDatabase.query(T_LOANS, null, "id = ?", arrayOf(id.toString()), null, null, null)
         .use { c -> if (c.moveToFirst()) MoneyDb.loan(c) else null }
 
     /** Which loan account is money lent and which is money borrowed, so entries can say "Given to …" or "Repaid to …". */
-    fun loanDirections(): Map<Long, LoanDirection> = loans().associate { it.accountId to it.direction }
+    fun loanDirections(): Map<Long, LoanDirection> = loans(book = Books.ALL).associate { it.accountId to it.direction }
 
-    /** Every loan with its person, history and where it stands today. */
-    fun loanItems(asOf: LocalDate = LocalDate.now()): List<LoanItem> {
-        val loans = loans()
+    /** Every loan (of [book]) with its person, history and where it stands today. */
+    fun loanItems(asOf: LocalDate = LocalDate.now(), book: Long? = null): List<LoanItem> {
+        val loans = loans(book)
         if (loans.isEmpty()) return emptyList()
-        val accounts = accounts(includeArchived = true, includeLoans = true).associateBy { it.id }
+        val accounts = accounts(includeArchived = true, includeLoans = true, book = Books.ALL).associateBy { it.id }
         val contacts = contacts().associateBy { it.id }
         val byLoan = db.readableDatabase.query(T_TXNS, null, "loan_id IS NOT NULL", null, null, null, "day, created")
             .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.txn(c)) } }.groupBy { it.loanId }
@@ -206,7 +329,21 @@ class MoneyRepository(private val context: Context) {
         }
     }
 
-    fun loanItem(id: Long, asOf: LocalDate = LocalDate.now()): LoanItem? = loanItems(asOf).firstOrNull { it.loan.id == id }
+    fun loanItem(id: Long, asOf: LocalDate = LocalDate.now()): LoanItem? = loanItems(asOf, book = Books.ALL).firstOrNull { it.loan.id == id }
+
+    /** The book's income and expense report (a business's profit and loss) for a period. */
+    fun bookReport(from: LocalDate, to: LocalDate, book: Long? = null): BookReport {
+        val b = resolve(book)
+        return Reports.build(
+            book = if (b == Books.ALL) null else books().firstOrNull { it.id == b },
+            from = from, to = to,
+            txns = txns(book = Books.ALL),
+            categories = categories(includeArchived = true, book = Books.ALL),
+            accounts = accounts(includeArchived = true, includeLoans = true, book = Books.ALL),
+            loans = loanItems(to, b).map { it.loan to it.summary },
+            uncategorized = context.getString(com.saraltechies.saralmoneytracker.R.string.uncategorized),
+        )
+    }
 
     // ---- Writes -------------------------------------------------------------------------------------------
 
@@ -245,7 +382,7 @@ class MoneyRepository(private val context: Context) {
 
     suspend fun saveCategory(c: Category): Long = write { w ->
         if (c.id == 0L) {
-            val sort = w.rawQuery("SELECT COALESCE(MAX(sort), -1) + 1 FROM $T_CATEGORIES WHERE kind = ?", arrayOf(c.kind.name))
+            val sort = w.rawQuery("SELECT COALESCE(MAX(sort), -1) + 1 FROM $T_CATEGORIES WHERE kind = ? AND book_id = ?", arrayOf(c.kind.name, c.bookId.toString()))
                 .use { it.moveToFirst(); it.getInt(0) }
             w.insert(T_CATEGORIES, null, MoneyDb.values(c.copy(sort = sort)))
         } else {
@@ -269,7 +406,7 @@ class MoneyRepository(private val context: Context) {
     }
 
     suspend fun moveCategory(category: Category, up: Boolean) = write { w ->
-        val list = w.query(T_CATEGORIES, null, "kind = ? AND archived = 0", arrayOf(category.kind.name), null, null, "sort, id")
+        val list = w.query(T_CATEGORIES, null, "kind = ? AND archived = 0 AND book_id = ?", arrayOf(category.kind.name, category.bookId.toString()), null, null, "sort, id")
             .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.category(c)) } }.toMutableList()
         val i = list.indexOfFirst { it.id == category.id }
         val j = if (up) i - 1 else i + 1
@@ -294,7 +431,7 @@ class MoneyRepository(private val context: Context) {
 
     /** Adds every repeating entry that has come due, and moves each rule to its next date. Returns how many were added. */
     suspend fun processRecurring(today: LocalDate = LocalDate.now()): Int {
-        val rules = withContext(Dispatchers.IO) { recurring() }.filter { it.active && !it.nextDate.isAfter(today) }
+        val rules = withContext(Dispatchers.IO) { recurring(book = Books.ALL) }.filter { it.active && !it.nextDate.isAfter(today) }
         if (rules.isEmpty()) return 0
         return write { w ->
             var added = 0
@@ -323,6 +460,7 @@ class MoneyRepository(private val context: Context) {
     /** Deletes everything and starts again with the default accounts and categories. */
     suspend fun deleteAll() = write { w ->
         listOf(T_TXNS, T_RECURRING, T_LOANS, T_CONTACTS, T_CATEGORIES, T_ACCOUNTS).forEach { w.delete(it, null, null) }
+        w.delete(T_BOOKS, "id != ?", arrayOf(Books.PERSONAL_ID.toString()))
         w.execSQL("DELETE FROM sqlite_sequence")
         db.seed(w)
     }
@@ -338,7 +476,7 @@ class MoneyRepository(private val context: Context) {
         val contactId = saveContactIn(w, contact.copy(name = contact.name.ifBlank { terms.name }))
         val account = Account(
             name = uniqueAccountName(w, terms.name.trim(), exceptId = null), type = AccountType.LOAN,
-            opening = if (accountId == null) amount * sign else 0, sort = Int.MAX_VALUE / 2,
+            opening = if (accountId == null) amount * sign else 0, sort = Int.MAX_VALUE / 2, bookId = terms.bookId,
         )
         val loanAccount = w.insert(T_ACCOUNTS, null, MoneyDb.values(account))
         val loanId = w.insert(T_LOANS, null, MoneyDb.values(loanFrom(terms, loanAccount).copy(contactId = contactId)))
@@ -353,7 +491,7 @@ class MoneyRepository(private val context: Context) {
             T_LOANS, MoneyDb.values(loanFrom(terms, loan.accountId).copy(id = loan.id, closed = loan.closed, createdAt = loan.createdAt, contactId = contactId)),
             "id = ?", arrayOf(loan.id.toString()),
         )
-        w.execSQL("UPDATE $T_ACCOUNTS SET name = ? WHERE id = ?", arrayOf<Any?>(uniqueAccountName(w, terms.name.trim(), loan.accountId), loan.accountId))
+        w.execSQL("UPDATE $T_ACCOUNTS SET name = ?, book_id = ? WHERE id = ?", arrayOf<Any?>(uniqueAccountName(w, terms.name.trim(), loan.accountId), terms.bookId, loan.accountId))
         // The old contact goes once nothing uses it.
         if (loan.contactId != null && loan.contactId != contactId) deleteContactIfUnused(w, loan.contactId)
     }
@@ -366,11 +504,13 @@ class MoneyRepository(private val context: Context) {
     ).use { c -> buildList { while (c.moveToNext()) add(MoneyDb.contact(c)) } }
 
     /** Your own details for statements: name or business, address, bank and UPI. */
-    fun myDetails(): Contact? = db.readableDatabase.query(T_CONTACTS, null, "kind = ?", arrayOf(ContactKind.SELF.name), null, null, "id", "1")
+    fun myDetails(book: Long? = null): Contact? = db.readableDatabase.query(
+        T_CONTACTS, null, "kind = ? AND book_id = ?", arrayOf(ContactKind.SELF.name, (resolve(book).takeIf { it != Books.ALL } ?: Books.PERSONAL_ID).toString()), null, null, "id", "1",
+    )
         .use { c -> if (c.moveToFirst()) MoneyDb.contact(c) else null }
 
     suspend fun saveMyDetails(details: Contact) = write { w ->
-        val existing = w.query(T_CONTACTS, arrayOf("id"), "kind = ?", arrayOf(ContactKind.SELF.name), null, null, "id", "1")
+        val existing = w.query(T_CONTACTS, arrayOf("id"), "kind = ? AND book_id = ?", arrayOf(ContactKind.SELF.name, details.bookId.toString()), null, null, "id", "1")
             .use { c -> if (c.moveToFirst()) c.getLong(0) else 0L }
         saveContactIn(w, details.copy(id = existing, kind = ContactKind.SELF))
     }
@@ -400,14 +540,14 @@ class MoneyRepository(private val context: Context) {
     suspend fun addLoanEntries(loan: Loan, entries: List<Pair<LoanEventKind, Long>>, date: LocalDate, accountId: Long, note: String) = write { w ->
         for ((kind, amount) in entries) {
             if (amount <= 0) continue
-            val categoryId = if (kind == LoanEventKind.INTEREST) interestCategory(w, loan.direction) else null
+            val categoryId = if (kind == LoanEventKind.INTEREST) interestCategory(w, loan.direction, loan.bookId) else null
             w.insert(T_TXNS, null, MoneyDb.values(loanTxn(loan.direction, loan.accountId, loan.id, kind, amount, date, accountId, note.trim(), categoryId)))
         }
     }
 
     /** Changes one entry of a loan's history. [kind] decides which way it goes, as when it was added. */
     suspend fun updateLoanEntry(loan: Loan, txn: Txn, kind: LoanEventKind, amount: Long, date: LocalDate, accountId: Long, note: String) = write { w ->
-        val categoryId = if (kind == LoanEventKind.INTEREST) (txn.categoryId ?: interestCategory(w, loan.direction)) else null
+        val categoryId = if (kind == LoanEventKind.INTEREST) (txn.categoryId ?: interestCategory(w, loan.direction, loan.bookId)) else null
         val updated = loanTxn(loan.direction, loan.accountId, loan.id, kind, amount, date, accountId, note.trim(), categoryId).copy(id = txn.id, createdAt = txn.createdAt)
         w.update(T_TXNS, MoneyDb.values(updated), "id = ?", arrayOf(txn.id.toString()))
     }
@@ -431,7 +571,7 @@ class MoneyRepository(private val context: Context) {
     }
 
     private fun loanFrom(terms: LoanTerms, accountId: Long) = Loan(
-        accountId = accountId, direction = terms.direction, startDate = terms.startDate, rate = terms.rate.coerceAtLeast(0), rateUnit = terms.rateUnit,
+        accountId = accountId, direction = terms.direction, startDate = terms.startDate, rate = terms.rate.coerceAtLeast(0), rateUnit = terms.rateUnit, bookId = terms.bookId,
         plan = terms.plan, installments = terms.installments.coerceAtLeast(0), installment = terms.installment.coerceAtLeast(0), note = terms.note.trim(),
     )
 
@@ -457,15 +597,15 @@ class MoneyRepository(private val context: Context) {
     }
 
     /** The category interest goes to: one you already have for interest, or a new "Interest received" / "Interest paid". */
-    private fun interestCategory(w: SQLiteDatabase, direction: LoanDirection): Long {
+    private fun interestCategory(w: SQLiteDatabase, direction: LoanDirection, bookId: Long): Long {
         val kind = if (direction == LoanDirection.LENT) TxnType.INCOME else TxnType.EXPENSE
-        val all = w.query(T_CATEGORIES, null, "kind = ? AND archived = 0", arrayOf(kind.name), null, null, "sort, id")
+        val all = w.query(T_CATEGORIES, null, "kind = ? AND archived = 0 AND book_id = ?", arrayOf(kind.name, bookId.toString()), null, null, "sort, id")
             .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.category(c)) } }
         all.firstOrNull { it.icon == INTEREST_ICON }?.let { return it.id }
         all.firstOrNull { it.name.contains("interest", ignoreCase = true) }?.let { return it.id }
         val name = context.getString(if (direction == LoanDirection.LENT) com.saraltechies.saralmoneytracker.R.string.interest_received else com.saraltechies.saralmoneytracker.R.string.interest_paid)
         val color = DefaultData.palette[if (direction == LoanDirection.LENT) 2 else 5]
-        return w.insert(T_CATEGORIES, null, MoneyDb.values(Category(name = name, kind = kind, icon = INTEREST_ICON, color = color, sort = all.size)))
+        return w.insert(T_CATEGORIES, null, MoneyDb.values(Category(name = name, kind = kind, icon = INTEREST_ICON, color = color, sort = all.size, bookId = bookId)))
     }
 
     /** Two loans to people with the same name get "Ravi" and "Ravi (2)", so backups can tell them apart. */
@@ -493,23 +633,36 @@ class MoneyRepository(private val context: Context) {
 
         fun key(s: String) = s.trim().lowercase(Locale.ROOT)
 
-        fun account(name: String, type: AccountType? = null, opening: Long = 0, archived: Boolean = false): Long {
+        // Books named in a backup are matched by name, and added when missing; anything without one goes to the chosen book.
+        val books = w.query(T_BOOKS, null, null, null, null, null, null)
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.book(c)) } }.toMutableList()
+        fun bookOf(name: String?): Long {
+            if (name.isNullOrBlank()) return options.bookId
+            books.firstOrNull { key(it.name) == key(name) }?.let { return it.id }
+            val kind = result.books.firstOrNull { key(it.name) == key(name) }?.kind ?: BookKind.BUSINESS
+            val book = Book(name = name.trim(), kind = kind, sort = books.size)
+            val id = w.insert(T_BOOKS, null, MoneyDb.values(book))
+            books += book.copy(id = id)
+            return id
+        }
+
+        fun account(name: String, type: AccountType? = null, opening: Long = 0, archived: Boolean = false, book: Long = options.bookId): Long {
             accounts.firstOrNull { key(it.name) == key(name) }?.let { return it.id }
-            val a = Account(name = name.trim(), type = type ?: guessAccountType(name), opening = opening, archived = archived, sort = accounts.size)
+            val a = Account(name = name.trim(), type = type ?: guessAccountType(name), opening = opening, archived = archived, sort = accounts.size, bookId = book)
             val id = w.insert(T_ACCOUNTS, null, MoneyDb.values(a))
             accounts += a.copy(id = id)
             accountsAdded++
             return id
         }
 
-        fun category(name: String, kind: TxnType, icon: String? = null, color: Int? = null): Long {
+        fun category(name: String, kind: TxnType, icon: String? = null, color: Int? = null, book: Long = options.bookId): Long {
             val wanted = name.ifBlank { if (kind == TxnType.INCOME) options.otherIncomeName else options.otherExpenseName }
-            categories.firstOrNull { it.kind == kind && key(it.name) == key(wanted) }?.let { return it.id }
-            if (name.isBlank()) categories.firstOrNull { it.kind == kind && it.icon == "other" && !it.archived }?.let { return it.id }
+            categories.firstOrNull { it.kind == kind && it.bookId == book && key(it.name) == key(wanted) }?.let { return it.id }
+            if (name.isBlank()) categories.firstOrNull { it.kind == kind && it.bookId == book && it.icon == "other" && !it.archived }?.let { return it.id }
             val c = Category(
                 name = wanted.trim(), kind = kind, icon = icon ?: "other",
                 color = color ?: DefaultData.palette[Math.floorMod(key(wanted).hashCode(), DefaultData.palette.size)],
-                sort = categories.count { it.kind == kind },
+                sort = categories.count { it.kind == kind && it.bookId == book }, bookId = book,
             )
             val id = w.insert(T_CATEGORIES, null, MoneyDb.values(c))
             categories += c.copy(id = id)
@@ -519,15 +672,17 @@ class MoneyRepository(private val context: Context) {
 
         val cardNames = if (options.cardBillsAsTransfers) cardBillCategories(result) else emptySet()
 
-        for (a in result.accounts) account(a.name, a.type, a.opening, a.archived)
+        for (a in result.accounts) account(a.name, a.type, a.opening, a.archived, bookOf(a.book))
 
         // Contacts from a backup, matched to ones already here by name. Your own details only fill in if you have none.
         val existingContacts = w.query(T_CONTACTS, null, null, null, null, null, null)
             .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.contact(c)) } }
         val contactIds = HashMap<String, Long>()
-        for (c in result.contacts) {
+        for ((index, c) in result.contacts.withIndex()) {
             val id = if (c.kind == ContactKind.SELF) {
-                existingContacts.firstOrNull { it.kind == ContactKind.SELF }?.id ?: w.insert(T_CONTACTS, null, MoneyDb.values(c.trimmed()))
+                val book = bookOf(result.contactBooks.getOrNull(index))
+                existingContacts.firstOrNull { it.kind == ContactKind.SELF && it.bookId == book }?.id
+                    ?: w.insert(T_CONTACTS, null, MoneyDb.values(c.trimmed().copy(bookId = book)))
             } else {
                 existingContacts.firstOrNull { it.kind != ContactKind.SELF && key(it.name) == key(c.name) }?.id
                     ?: w.insert(T_CONTACTS, null, MoneyDb.values(c.trimmed()))
@@ -545,7 +700,7 @@ class MoneyRepository(private val context: Context) {
                 MoneyDb.values(
                     Loan(
                         accountId = accountId, direction = l.direction, startDate = l.startDate, rate = l.rate, rateUnit = l.rateUnit, plan = l.plan,
-                        installments = l.installments, installment = l.installment, note = l.note, closed = l.closed,
+                        installments = l.installments, installment = l.installment, note = l.note, closed = l.closed, bookId = bookOf(l.book),
                         contactId = (l.contact ?: l.name).let { contactIds[key(it)] } ?: w.insert(T_CONTACTS, null, MoneyDb.values(Contact(name = l.name))),
                     ),
                 ),
@@ -556,7 +711,7 @@ class MoneyRepository(private val context: Context) {
             row.loan?.let { loanIds[key(it)] } ?: loansByAccount[from]?.id ?: to?.let { loansByAccount[it]?.id }
         for (c in result.categories) {
             if (c.kind == TxnType.EXPENSE && key(c.name) in cardNames) continue
-            val id = category(c.name, c.kind, c.icon, c.color)
+            val id = category(c.name, c.kind, c.icon, c.color, bookOf(c.book))
             if (c.budget != null && (options.useBudgets || result.isBackup) && c.kind == TxnType.EXPENSE) {
                 w.execSQL("UPDATE $T_CATEGORIES SET budget = ? WHERE id = ?", arrayOf(c.budget, id))
                 budgetsSet++
@@ -589,7 +744,7 @@ class MoneyRepository(private val context: Context) {
                     val to = row.toAccount?.let { account(it) } ?: continue
                     Txn(type = TxnType.TRANSFER, amount = row.amount, date = row.date, categoryId = null, accountId = from, toAccountId = to, note = row.note, loanId = loanOf(row, from, to))
                 }
-                else -> Txn(type = row.type, amount = row.amount, date = row.date, categoryId = category(row.category, row.type), accountId = from, note = row.note, loanId = row.loan?.let { loanIds[key(it)] })
+                else -> Txn(type = row.type, amount = row.amount, date = row.date, categoryId = category(row.category, row.type, book = bookOf(row.book)), accountId = from, note = row.note, loanId = row.loan?.let { loanIds[key(it)] })
             }
             val k = listOf(txn.type.name, txn.date.toEpochDay(), txn.amount, txn.categoryId ?: "", key(txn.note)).joinToString("|")
             if (!existing.add(k)) {
@@ -606,7 +761,7 @@ class MoneyRepository(private val context: Context) {
         for (r in result.recurring) {
             val rule = Recurring(
                 type = r.type, amount = r.amount,
-                categoryId = if (r.type == TxnType.TRANSFER) null else category(r.category, r.type),
+                categoryId = if (r.type == TxnType.TRANSFER) null else category(r.category, r.type, book = bookOf(r.book)),
                 accountId = r.account?.let { account(it) } ?: options.defaultAccountId,
                 toAccountId = r.toAccount?.let { account(it) },
                 note = r.note, frequency = r.frequency, startDate = r.startDate, nextDate = r.nextDate, endDate = r.endDate, active = r.active,

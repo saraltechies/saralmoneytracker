@@ -7,7 +7,6 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.saraltechies.saralmoneytracker.data.LoanTerms
@@ -59,7 +58,7 @@ class StoreScreenshotsTest {
 
             click(s(R.string.add_entry))
             shot("2-add-entry")
-            Espresso.pressBack()
+            back()
             settle()
 
             click(s(R.string.tab_accounts))
@@ -67,15 +66,15 @@ class StoreScreenshotsTest {
             shot("3-credit-ledger")
             click("Anita General Store")
             shot("4-customer")
-            Espresso.pressBack()
-            Espresso.pressBack()
+            back()
+            back()
             settle()
 
             click(s(R.string.loans_title))
             click("Punjab National Bank")
             shot("5-loan-emi")
-            Espresso.pressBack()
-            Espresso.pressBack()
+            back()
+            back()
             settle()
 
             click(s(R.string.tab_stats))
@@ -86,6 +85,11 @@ class StoreScreenshotsTest {
             click(", about", substring = true)
             shot("7-cash-flow")
         }
+    }
+
+    private fun back() {
+        instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.waitForIdle()
     }
 
     private fun settle() {

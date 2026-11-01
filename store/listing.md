@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.3.0. Re-check before each release.
+Every claim below matches the code as of 1.4.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -55,6 +55,12 @@ PERSONAL AND BUSINESS, KEPT APART
 • Money you put in or take out is capital or drawings, never income or spending
 • Profit and loss report as a PDF, by month or financial year, for you, your accountant or bank
 
+CREDIT LEDGER FOR CUSTOMERS AND SUPPLIERS
+• Record what you gave and got on credit in two taps, with a running balance for each person
+• Sales and purchases on credit are counted once; payments aren't counted again
+• Send a payment reminder on WhatsApp or SMS, with your UPI ID
+• PDF account statement with a UPI scan-to-pay code
+
 REPEATING ENTRIES
 • Add salary, rent, EMIs, SIPs and subscriptions once
 • They're recorded on their dates by themselves: daily, weekly, monthly or yearly
@@ -75,6 +81,7 @@ ALSO
 • 29 currencies, with Indian number format for rupees (₹1,25,000)
 • Your own categories with 49 icons and 20 colours
 • Optional daily reminder, only on days you haven't added anything
+• Home-screen widget and a quick-settings tile to add an expense in a tap
 • Light and dark themes, launcher shortcuts for Add expense, Add income and Transfer
 
 Made in India by Saral Techies (saraltechies.com).

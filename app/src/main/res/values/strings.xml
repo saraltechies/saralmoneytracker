@@ -646,7 +646,6 @@
     <string name="widget_name">Today\'s spending</string>
     <string name="widget_description">What you spent today and this month, with Add expense and Add income</string>
     <string name="widget_spent_today">Spent today</string>
-    <string name="widget_spent_today_in">Spent today · %1$s</string>
     <string name="widget_this_month">This month %1$s</string>
     <string name="widget_this_month_placeholder">This month</string>
     <string name="widget_expense_button">− Expense</string>

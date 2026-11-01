@@ -79,10 +79,12 @@ object Widgets {
         val views = RemoteViews(app.packageName, R.layout.widget_money)
         views.setTextViewText(
             R.id.widget_label,
-            if (bookName != null) app.getString(R.string.widget_spent_today_in, bookName) else app.getString(R.string.widget_spent_today),
+            app.getString(R.string.widget_spent_today),
         )
         views.setTextViewText(R.id.widget_today, Money.format(todaySpent, prefs.currency))
-        views.setTextViewText(R.id.widget_month, app.getString(R.string.widget_this_month, Money.format(monthSpent, prefs.currency)))
+        val monthText = app.getString(R.string.widget_this_month, Money.format(monthSpent, prefs.currency))
+        // The book's name goes on the second line, where there is room for it.
+        views.setTextViewText(R.id.widget_month, if (bookName != null) "$monthText · $bookName" else monthText)
         views.setOnClickPendingIntent(R.id.widget_root, open(app, null, 0))
         views.setOnClickPendingIntent(R.id.widget_add_expense, open(app, AppShortcuts.ID_EXPENSE, 1))
         views.setOnClickPendingIntent(R.id.widget_add_income, open(app, AppShortcuts.ID_INCOME, 2))

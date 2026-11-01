@@ -77,9 +77,9 @@ class LedgerAndWidgetTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
             val views = RemoteViews(context.packageName, R.layout.widget_money)
-            views.setTextViewText(R.id.widget_label, context.getString(R.string.widget_spent_today_in, "Sharma Traders"))
+            views.setTextViewText(R.id.widget_label, context.getString(R.string.widget_spent_today))
             views.setTextViewText(R.id.widget_today, "₹1,250")
-            views.setTextViewText(R.id.widget_month, context.getString(R.string.widget_this_month, "₹38,420"))
+            views.setTextViewText(R.id.widget_month, context.getString(R.string.widget_this_month, "₹38,420") + " · Sharma Traders")
             val parent = FrameLayout(context)
             val view = views.apply(context, parent)
             val density = context.resources.displayMetrics.density

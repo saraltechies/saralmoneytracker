@@ -221,7 +221,8 @@ class PartyStatementPdf(private val context: Context, private val currency: Curr
             )
         }
         if (y + 16f > bottomLimit) newPage()
-        row(listOf(Dates.medium(LocalDate.now()), s(R.string.pdf_closing_balance), "", "", balanceText(item.balance)), shaded = false, bold = true)
+        val closing = maxOf(LocalDate.now(), item.entries.lastOrNull()?.date ?: LocalDate.now())
+        row(listOf(Dates.medium(closing), s(R.string.pdf_closing_balance), "", "", balanceText(item.balance)), shaded = false, bold = true)
         canvas.drawText(s(R.string.ledger_dr_cr_note), margin, y + 12f, paint(7.5f, slate))
         y += 30f
     }

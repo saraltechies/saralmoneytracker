@@ -8,7 +8,7 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=com.saraltechies.saralmoneytracker)
 -->
 
-## Features (1.5)
+## Features (1.6)
 
 - **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), your most used categories first (with **More**
   and a search for the rest), today/yesterday chips, and
@@ -45,6 +45,11 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 - **Credit ledger** for customers and suppliers on credit: You gave / You got in two taps, a running balance for each,
   goods on credit counted as a sale or purchase once, old balances, payment reminders by WhatsApp or SMS with your UPI
   ID, and a PDF account statement with a UPI scan-to-pay code.
+- **Due dates in the ledger**: a credit period per customer or supplier (7 to 60 days). Payments settle the oldest bills
+  first; each person shows what is overdue and since when, and the next amount due, with an **Overdue** filter. Entries can
+  repeat weekly or monthly (rent from a tenant, a monthly milk bill).
+- **Cash flow**: the expected balance at month end, or in 30 or 90 days, from repeating income and bills, loan EMIs and
+  interest, and ledger bills as they fall due, with the balance after each and the lowest point.
 - **Home-screen widget** (spent today and this month, with Add expense / Add income) and a **quick-settings tile** to add
   an expense from anywhere.
 - **Search** every note and category; filter by expense, income or transfer.
@@ -56,7 +61,9 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   No internet or storage permission: Android's folder picker grants access to that one folder.
 - **First-run setup** (personal, business or both) and a **What's new** sheet for people updating.
 - **App lock** with the phone's fingerprint, face or screen lock; optional **hide in recent apps** (blocks screenshots).
-- **Daily reminder** in the evening on days nothing was added, and on the day a loan payment is due.
+- **Daily reminder** in the evening on days nothing was added.
+- **Morning alerts** at 9 am: bills coming up (a repeating entry can remind you 1 to 7 days before), and loan or ledger
+  payments due today. A **monthly summary** on the first morning of each month. Both can be turned off.
 - 29 currencies, Indian number grouping for rupees (₹1,25,000), editable categories with 49 icons and 20 colours,
   light/dark theme, launcher shortcuts (Add expense, Add income, Transfer).
 - Google Play rating and in-app update prompts (through the Play Store app, so still no internet permission).

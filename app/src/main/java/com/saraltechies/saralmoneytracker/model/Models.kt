@@ -82,4 +82,6 @@ data class Recurring(
     val nextDate: LocalDate,
     val endDate: LocalDate? = null,
     val active: Boolean = true,
+    /** Days before each date to send a reminder (to pay the rent, the EMI, the card bill); 0 for none. */
+    val remindDays: Int = 0,
 )

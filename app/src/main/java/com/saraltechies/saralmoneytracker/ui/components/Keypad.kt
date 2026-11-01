@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -70,6 +71,8 @@ object KeypadInput {
 @Composable
 fun Keypad(onKey: (Char) -> Unit, onBackspace: () -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
+    // Shorter keys on short phones, so a full row of categories still shows above the keypad.
+    val keyHeight = if (LocalConfiguration.current.screenHeightDp < 760) 44.dp else 52.dp
     val rows = listOf(
         listOf('7', '8', '9', '÷'),
         listOf('4', '5', '6', '×'),
@@ -89,7 +92,7 @@ fun Keypad(onKey: (Char) -> Unit, onBackspace: () -> Unit, modifier: Modifier = 
                         },
                         shape = RoundedCornerShape(14.dp),
                         color = if (isOp) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.weight(1f).height(52.dp).semantics { if (key == '⌫') contentDescription = backspace },
+                        modifier = Modifier.weight(1f).height(keyHeight).semantics { if (key == '⌫') contentDescription = backspace },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             if (key == '⌫') {

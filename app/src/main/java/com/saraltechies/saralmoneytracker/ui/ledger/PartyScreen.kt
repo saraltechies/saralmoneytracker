@@ -74,6 +74,7 @@ import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.Books
 import com.saraltechies.saralmoneytracker.model.Category
 import com.saraltechies.saralmoneytracker.model.Contact
+import com.saraltechies.saralmoneytracker.model.Frequency
 import com.saraltechies.saralmoneytracker.model.LedgerEntry
 import com.saraltechies.saralmoneytracker.model.LedgerKind
 import com.saraltechies.saralmoneytracker.model.Ledgers
@@ -89,6 +90,7 @@ import com.saraltechies.saralmoneytracker.ui.components.IconBadge
 import com.saraltechies.saralmoneytracker.ui.components.LocalCurrency
 import com.saraltechies.saralmoneytracker.ui.components.PickerRow
 import com.saraltechies.saralmoneytracker.ui.components.SectionTitle
+import com.saraltechies.saralmoneytracker.ui.components.frequencyLabel
 import com.saraltechies.saralmoneytracker.ui.components.money
 import com.saraltechies.saralmoneytracker.ui.theme.AppTheme
 import com.saraltechies.saralmoneytracker.util.PartyStatementPdf
@@ -119,6 +121,7 @@ fun PartyScreen(
     var entry by remember { mutableStateOf<Pair<Boolean, LedgerEntry?>?>(null) }
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val rules by remember { repository.watch { repository.partyItem(partyId)?.let { repository.partyRules(it.party) }.orEmpty() } }.collectAsStateWithLifecycle(emptyList())
     var remind by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
 
@@ -201,6 +204,19 @@ fun PartyScreen(
                                 (current.contact?.phone?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        val dues = remember(current) { Ledgers.dues(current.party, current.entries, LocalDate.now()) }
+                        if (dues.overdue > 0) {
+                            Text(
+                                stringResource(R.string.ledger_overdue_since, money(dues.overdue), Dates.short(dues.oldestOverdue ?: LocalDate.now())),
+                                style = MaterialTheme.typography.bodyMedium, color = AppTheme.money.expense, fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        dues.next?.let { (date, amount) ->
+                            Text(
+                                stringResource(R.string.ledger_next_due, money(amount), Dates.relative(date)),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -222,6 +238,26 @@ fun PartyScreen(
                         Icon(Icons.AutoMirrored.Filled.Send, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(if (b > 0) R.string.ledger_remind else R.string.ledger_share_balance))
+                    }
+                }
+            }
+            if (rules.isNotEmpty()) {
+                item { SectionTitle(stringResource(R.string.repeating_entries)) }
+                items(rules, key = { "rule:${it.id}" }) { r ->
+                    val gaveRule = (r.type == TxnType.INCOME) || (r.type == TxnType.TRANSFER && r.toAccountId == current.party.accountId)
+                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(if (gaveRule) R.string.ledger_you_gave else R.string.ledger_you_got) + " · " + money(r.amount) + " · " +
+                                    stringResource(frequencyLabel(r.frequency)),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                listOfNotNull(stringResource(R.string.next_on, Dates.relative(r.nextDate)), r.note.takeIf { it.isNotBlank() }).joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = { scope.launch { repository.deleteRecurring(r.id) } }) { Text(stringResource(R.string.ledger_stop_repeat)) }
                     }
                 }
             }
@@ -249,10 +285,12 @@ fun PartyScreen(
                 item = current, gave = gave, existing = existing, accounts = accounts.filter { !it.archived },
                 categories = categories.filter { !it.archived && it.bookId == current.party.bookId },
                 onDismiss = { entry = null },
-                onSave = { amount, date, accountId, categoryId, note ->
+                onSave = { amount, date, accountId, categoryId, note, repeat ->
                     scope.launch {
                         if (existing?.kind == LedgerKind.OPENING) {
                             repository.updateParty(current.party, current.contact ?: Contact(name = current.name), current.party.role, current.party.bookId, if (gave) amount else -amount)
+                        } else if (repeat != null) {
+                            repository.savePartyRule(current.party, gave, amount, date, accountId, categoryId, note, repeat)
                         } else {
                             repository.savePartyEntry(
                                 current.party, gave, amount, date, accountId, categoryId, note,
@@ -339,7 +377,7 @@ private fun EntryDialog(
     accounts: List<Account>,
     categories: List<Category>,
     onDismiss: () -> Unit,
-    onSave: (amount: Long, date: LocalDate, accountId: Long?, categoryId: Long?, note: String) -> Unit,
+    onSave: (amount: Long, date: LocalDate, accountId: Long?, categoryId: Long?, note: String, repeat: Frequency?) -> Unit,
     onDelete: (LedgerEntry) -> Unit,
 ) {
     val customer = item.party.role == PartyRole.CUSTOMER
@@ -364,6 +402,7 @@ private fun EntryDialog(
     var pickAccount by remember { mutableStateOf(false) }
     var pickCategory by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var repeat by rememberSaveable { mutableStateOf<Frequency?>(null) }
     var error by remember { mutableStateOf<Int?>(null) }
     val date = LocalDate.ofEpochDay(dateDay)
     val kindCategories = categories.filter { it.kind == categoryKind }
@@ -418,6 +457,18 @@ private fun EntryDialog(
                         )
                     }
                     PickerRow(Icons.Filled.CalendarToday, stringResource(R.string.date), Dates.medium(date), onClick = { pickDate = true })
+                    if (existing == null) {
+                        // Rent from a tenant, a monthly milk bill: recorded on its date every time.
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.repeat), style = MaterialTheme.typography.labelLarge)
+                            listOf(null, Frequency.WEEKLY, Frequency.MONTHLY).forEach { f ->
+                                FilterChip(
+                                    selected = repeat == f, onClick = { repeat = f },
+                                    label = { Text(f?.let { stringResource(frequencyLabel(it)) } ?: stringResource(R.string.repeat_never)) },
+                                )
+                            }
+                        }
+                    }
                     OutlinedTextField(
                         value = note, onValueChange = { note = it.take(200) },
                         placeholder = { Text(stringResource(R.string.ledger_note_hint)) },
@@ -438,7 +489,7 @@ private fun EntryDialog(
                     else -> null
                 }
                 if (error != null || amount == null) return@TextButton
-                onSave(amount, date, if (goods) null else accountId, if (goods) chosenCategory?.id else null, note)
+                onSave(amount, date, if (goods) null else accountId, if (goods) chosenCategory?.id else null, note, if (existing == null) repeat else null)
                 onDismiss()
             }) { Text(stringResource(R.string.save)) }
         },

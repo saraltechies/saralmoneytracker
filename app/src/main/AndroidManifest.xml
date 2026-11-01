@@ -64,6 +64,11 @@
             android:name=".util.BackupReceiver"
             android:exported="false" />
 
+        <!-- Morning alerts: bills coming up, payments due today, the monthly summary. -->
+        <receiver
+            android:name=".util.AlertsReceiver"
+            android:exported="false" />
+
         <!-- Home-screen widget: today's and this month's spending, Add expense / Add income. -->
         <receiver
             android:name=".util.MoneyWidget"

@@ -40,6 +40,7 @@ import com.saraltechies.saralmoneytracker.ui.components.MainBottomBar
 import com.saraltechies.saralmoneytracker.ui.components.MainTab
 import com.saraltechies.saralmoneytracker.ui.contacts.MyDetailsScreen
 import com.saraltechies.saralmoneytracker.ui.edit.EditScreen
+import com.saraltechies.saralmoneytracker.ui.forecast.ForecastScreen
 import com.saraltechies.saralmoneytracker.ui.home.HomeScreen
 import com.saraltechies.saralmoneytracker.ui.importing.ImportScreen
 import com.saraltechies.saralmoneytracker.ui.ledger.LedgerScreen
@@ -75,6 +76,7 @@ private object Routes {
     const val MY_DETAILS = "myDetails"
     const val BOOKS = "books"
     const val LEDGER = "ledger"
+    const val FORECAST = "forecast"
     const val PARTY = "party/{id}"
     const val PARTY_EDIT = "partyEdit?id={id}&role={role}"
 
@@ -158,6 +160,7 @@ fun AppNav(
                     WhatsNewTarget.LEDGER -> nav.navigate(Routes.LEDGER)
                     WhatsNewTarget.LOANS -> nav.navigate(Routes.LOANS)
                     WhatsNewTarget.BACKUP -> nav.navigate(Routes.settings(backup = true))
+                    WhatsNewTarget.FORECAST -> nav.navigate(Routes.FORECAST)
                     WhatsNewTarget.NONE -> Unit
                 }
             },
@@ -185,6 +188,7 @@ fun AppNav(
                     onImport = { nav.navigate(Routes.IMPORT) },
                     onOpenLoans = { nav.navigate(Routes.LOANS) },
                     onOpenLedger = { nav.navigate(Routes.LEDGER) },
+                    onOpenForecast = { nav.navigate(Routes.FORECAST) },
                     onOpenLoan = { nav.navigate(Routes.loan(it)) },
                     onSelectBook = selectBook,
                     onManageBooks = { nav.navigate(Routes.BOOKS) },
@@ -322,6 +326,7 @@ fun AppNav(
             }
             composable(Routes.MY_DETAILS) { MyDetailsScreen(repository, onBack = { nav.popBackStack() }) }
             composable(Routes.BOOKS) { BooksScreen(repository, snackbar, onBack = { nav.popBackStack() }, onSelect = selectBook) }
+            composable(Routes.FORECAST) { ForecastScreen(repository, onBack = { nav.popBackStack() }) }
             composable(Routes.LEDGER) {
                 LedgerScreen(
                     repository,

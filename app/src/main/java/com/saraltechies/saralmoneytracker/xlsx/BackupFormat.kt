@@ -96,13 +96,14 @@ object BackupFormat {
         )
         w.sheet(
             SHEET_RECURRING,
-            listOf(listOf("Type", "Amount", "Category", "Account", "To account", "Note", "Repeat", "Start date", "Next date", "End date", "Paused", "Book")) +
+            listOf(listOf("Type", "Amount", "Category", "Account", "To account", "Note", "Repeat", "Start date", "Next date", "End date", "Paused", "Book", "Remind days before")) +
                 data.recurring.map { r ->
                     listOf(
                         typeName(r.type), MoneyCell(r.amount), r.categoryId?.let { cat[it]?.name }.orEmpty(),
                         acc[r.accountId]?.name.orEmpty(), r.toAccountId?.let { acc[it]?.name }.orEmpty(), r.note,
                         frequencyName(r.frequency), r.startDate, r.nextDate, r.endDate, if (r.active) "" else "Yes",
                         bookOf(r.categoryId?.let { cat[it]?.bookId } ?: acc[r.accountId]?.bookId ?: Books.PERSONAL_ID),
+                        if (r.remindDays > 0) r.remindDays.toString() else "",
                     )
                 },
             widths = listOf(10, 14, 22, 18, 18, 30, 10, 14, 14, 14, 8, 16),
@@ -143,8 +144,8 @@ object BackupFormat {
         if (data.parties.isNotEmpty()) {
             w.sheet(
                 SHEET_PARTIES,
-                listOf(listOf("Name", "Role", "Contact", "Book")) + data.parties.map { p ->
-                    listOf(acc[p.accountId]?.name.orEmpty(), roleName(p.role), p.contactId?.let { contactNames[it] }.orEmpty(), bookOf(p.bookId))
+                listOf(listOf("Name", "Role", "Contact", "Book", "Credit days")) + data.parties.map { p ->
+                    listOf(acc[p.accountId]?.name.orEmpty(), roleName(p.role), p.contactId?.let { contactNames[it] }.orEmpty(), bookOf(p.bookId), if (p.creditDays > 0) p.creditDays.toString() else "")
                 },
                 widths = listOf(24, 12, 24, 16),
             )

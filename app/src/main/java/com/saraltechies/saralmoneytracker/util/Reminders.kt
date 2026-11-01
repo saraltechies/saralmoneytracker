@@ -122,7 +122,6 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val prefs = app.settings.current()
                 if (prefs.reminderOn && !app.repository.hasTxnOn(LocalDate.now())) Reminders.show(context)
-                if (prefs.reminderOn) Reminders.showLoansDue(context, app.repository.loanItems(book = com.saraltechies.saralmoneytracker.model.Books.ALL), prefs.currency)
             } finally {
                 pending.finish()
             }
@@ -140,6 +139,7 @@ class RescheduleReceiver : BroadcastReceiver() {
                 val prefs = app.settings.current()
                 Reminders.schedule(context, prefs.reminderOn, prefs.reminderMinute)
                 Widgets.refreshNow(context)
+                Alerts.schedule(context, prefs.alertsOn || prefs.monthlySummaryOn)
                 AutoBackup.schedule(context, prefs.backupFrequency != com.saraltechies.saralmoneytracker.data.BackupFrequency.OFF && prefs.backupFolder != null)
             } finally {
                 pending.finish()

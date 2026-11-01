@@ -1,7 +1,7 @@
 # Play Console answers for Saral Money Tracker
 
 Answers for every declaration in **Policy → App content**, plus the release setup.
-They match the code as of v1.5.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
+They match the code as of v1.6.0: no ads, no analytics, no crash reporting, and **no INTERNET permission**
 (the manifest removes it and the release workflow fails if it appears).
 **Re-check them whenever you add an SDK or a permission.**
 
@@ -75,7 +75,18 @@ The app does not use SMS, call log, location, contacts or all-files access.
   (graphics path, DataStore) that Google ships already stripped, so there are no symbols to upload.
 - Deobfuscation file: nothing to do. The build puts `mapping.txt` inside the AAB and Play picks it up (App bundle
   explorer → Downloads shows it as "ReTrace mapping file").
-- Release name: `1.5.0 (6)` (earlier: `1.4.0 (5)`, `1.3.0 (4)`, `1.2.0 (3)`, `1.1.0 (2)`, `1.0.0 (1)`)
+- Release name: `1.6.0 (7)` (earlier: `1.5.0 (6)`, `1.4.0 (5)`, `1.3.0 (4)`, `1.2.0 (3)`, `1.1.0 (2)`, `1.0.0 (1)`)
+- Release notes for 1.6.0 (en-IN):
+  ```
+  <en-IN>
+  New: due dates and cash flow.
+  • Credit period for customers and suppliers, with an Overdue list
+  • Alerts at 9 am for bills coming up and payments due today
+  • Cash flow: your expected balance at month end
+  • Repeat a credit entry monthly, like rent from a tenant
+  • Monthly summary on the 1st
+  </en-IN>
+  ```
 - Release notes for 1.5.0 (en-IN):
   ```
   <en-IN>

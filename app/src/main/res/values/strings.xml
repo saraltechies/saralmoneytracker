@@ -773,6 +773,11 @@
     <string name="whatsnew_subtitle">A lot has arrived since the first version. Here\'s what you can do now.</string>
     <string name="whatsnew_settings_summary">Everything new since the first version</string>
     <string name="whatsnew_got_it">Got it</string>
+    <string name="whatsnew_forecast_title">Cash flow</string>
+    <string name="whatsnew_forecast_text">See your expected balance at month end, with salary, bills, EMIs and customer payments still to come.</string>
+    <string name="whatsnew_alerts_title">Due dates and bill alerts</string>
+    <string name="whatsnew_alerts_text">Credit days for customers and suppliers with an overdue list, reminders before bills, and a monthly summary.</string>
+    <string name="whatsnew_alerts_action">Set credit days</string>
     <string name="whatsnew_open">Open</string>
     <string name="whatsnew_backup_title">Automatic backup</string>
     <string name="whatsnew_backup_text">Daily or weekly backups to a folder you choose, such as Google Drive.</string>
@@ -788,6 +793,58 @@
     <string name="whatsnew_pdf_text">Send loan and account statements with a UPI scan-to-pay code. Add Your details in Settings first.</string>
     <string name="whatsnew_widget_title">Widget and quick add</string>
     <string name="whatsnew_widget_text">Add the "Today\'s spending" widget to your home screen, or the Add expense tile to quick settings.</string>
+
+    <!-- Bill reminders, dues and the monthly summary -->
+    <string name="remind_me">Remind me</string>
+    <string name="remind_off">No reminder</string>
+    <plurals name="remind_days_before">
+        <item quantity="one">%1$d day before</item>
+        <item quantity="other">%1$d days before</item>
+    </plurals>
+    <string name="alerts_channel">Bills and payments due</string>
+    <string name="alerts_setting">Bill and due-date alerts</string>
+    <string name="alerts_setting_summary">At 9 am: bills coming up, and loan or customer payments due today</string>
+    <string name="alert_bills_title">Bills coming up</string>
+    <string name="alert_bill">%1$s: %2$s due on %3$s</string>
+    <string name="alert_bill_income">%1$s: %2$s expected on %3$s</string>
+    <string name="alert_dues_title">Payments due today</string>
+    <string name="summary_channel">Monthly summary</string>
+    <string name="summary_setting">Monthly summary</string>
+    <string name="summary_setting_summary">On the first morning of each month: how the last one went</string>
+    <string name="summary_title">%1$s · %2$s</string>
+    <string name="summary_line_totals">Spent %1$s · Earned %2$s</string>
+    <string name="summary_line_saved">Saved %1$s</string>
+    <string name="summary_line_overspent">Spent %1$s more than you earned</string>
+    <string name="summary_line_top">Most spent on %1$s: %2$s</string>
+    <string name="summary_line_collect">Customers still owe you %1$s</string>
+
+    <!-- Credit ledger due dates -->
+    <string name="ledger_credit_days">Credit period</string>
+    <string name="ledger_no_due_dates">No due dates</string>
+    <string name="ledger_days">%1$d days</string>
+    <string name="ledger_credit_days_hint_customer">Each sale on credit is due this many days later. You\'ll see what\'s overdue and get an alert on the due date.</string>
+    <string name="ledger_credit_days_hint_supplier">Each purchase on credit is due this many days later, so you know when to pay.</string>
+    <string name="ledger_overdue_since">Overdue %1$s, since %2$s</string>
+    <string name="ledger_overdue_amount">Overdue %1$s</string>
+    <string name="ledger_overdue_filter">Overdue (%1$d)</string>
+    <string name="ledger_next_due">Next %1$s due %2$s</string>
+    <string name="ledger_stop_repeat">Stop</string>
+
+    <!-- Cash-flow forecast -->
+    <string name="forecast_title">Cash flow</string>
+    <string name="forecast_month_end">This month</string>
+    <string name="forecast_days">%1$d days</string>
+    <string name="forecast_expected_on">Expected balance on %1$s</string>
+    <string name="forecast_now">Now</string>
+    <string name="forecast_in">Coming in</string>
+    <string name="forecast_out">Going out</string>
+    <string name="forecast_low">Lowest: %1$s on %2$s</string>
+    <string name="forecast_low_negative">Runs short: %1$s on %2$s</string>
+    <string name="forecast_hint">From your repeating entries, EMIs and interest, and customers\' and suppliers\' bills as they fall due. Entries you haven\'t recorded yet aren\'t known.</string>
+    <string name="forecast_empty_title">Nothing expected yet</string>
+    <string name="forecast_empty_text">Add repeating entries (salary, rent, bills), loans with EMIs, or credit days for customers to see where your money is heading.</string>
+    <string name="forecast_card_title">By %1$s, about</string>
+    <string name="forecast_card_text">Still to come in %1$s · to go out %2$s</string>
 
     <string-array name="default_business_expense_categories">
         <item>Purchases &amp; Stock</item>

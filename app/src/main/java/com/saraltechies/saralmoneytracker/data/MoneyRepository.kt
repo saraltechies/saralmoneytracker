@@ -26,6 +26,8 @@ import com.saraltechies.saralmoneytracker.model.LoanMath
 import com.saraltechies.saralmoneytracker.model.LoanSummary
 import com.saraltechies.saralmoneytracker.model.LoanEvent
 import com.saraltechies.saralmoneytracker.model.BookReport
+import com.saraltechies.saralmoneytracker.model.CashForecast
+import com.saraltechies.saralmoneytracker.model.Forecasts
 import com.saraltechies.saralmoneytracker.model.LedgerEntry
 import com.saraltechies.saralmoneytracker.model.Ledgers
 import com.saraltechies.saralmoneytracker.model.Party
@@ -382,6 +384,28 @@ class MoneyRepository(private val context: Context) {
 
     fun partyItem(id: Long): PartyItem? = partyItems(Books.ALL).firstOrNull { it.party.id == id }
 
+
+    /** Repeating entries with a customer or supplier (monthly rent from a tenant, a monthly milk bill). */
+    fun partyRules(party: Party): List<Recurring> = recurring(book = Books.ALL).filter { it.accountId == party.accountId || it.toAccountId == party.accountId }
+
+    /**
+     * Where the money of the book on screen is heading until [to]: today's balance of its accounts plus repeating
+     * entries, loan payments and customers' and suppliers' bills expected by then.
+     */
+    fun forecast(to: LocalDate, today: LocalDate = LocalDate.now(), book: Long? = null): CashForecast {
+        val balances = balances()
+        val start = accounts(book = book).sumOf { balances[it.id] ?: 0 }
+        val categories = categories(includeArchived = true, book = Books.ALL).associateBy { it.id }
+        val accountsById = accounts(includeArchived = true, includeLoans = true, book = Books.ALL).associateBy { it.id }
+        return Forecasts.build(
+            today = today, to = to, startBalance = start,
+            // A repeating charge to a customer (or from a supplier) is money only when paid: it shows up in their bills.
+            rules = recurring(book).filter { accountsById[it.accountId]?.type?.isHidden != true },
+            ruleTitle = { r -> r.note.ifBlank { r.categoryId?.let { categories[it]?.name } ?: accountsById[r.accountId]?.name.orEmpty() } },
+            loans = loanItems(today, book).map { Triple(it.loan, it.summary, it.name) },
+            ledgerBills = partyItems(book).map { Triple(it.party, Ledgers.dues(it.party, it.entries, today), it.name) },
+        )
+    }
     /** The party an account belongs to, so an entry opened from a list goes to that customer's or supplier's page. */
     fun partyForAccount(accountId: Long): Party? = db.readableDatabase.query(T_PARTIES, null, "account_id = ?", arrayOf(accountId.toString()), null, null, null)
         .use { c -> if (c.moveToFirst()) MoneyDb.party(c) else null }
@@ -390,19 +414,19 @@ class MoneyRepository(private val context: Context) {
      * Adds a customer or supplier. [opening] is what was owed before the app (plus: they owe you), kept as the
      * party account's opening balance so it doesn't count as a sale or change your other balances.
      */
-    suspend fun createParty(contact: Contact, role: PartyRole, bookId: Long, opening: Long): Long = write { w ->
+    suspend fun createParty(contact: Contact, role: PartyRole, bookId: Long, opening: Long, creditDays: Int = 0): Long = write { w ->
         val contactId = saveContactIn(w, contact)
         val account = Account(
             name = uniqueAccountName(w, contact.name.trim(), null), type = AccountType.PARTY, opening = opening,
             sort = Int.MAX_VALUE / 2, bookId = bookId,
         )
         val accountId = w.insert(T_ACCOUNTS, null, MoneyDb.values(account))
-        w.insert(T_PARTIES, null, MoneyDb.values(Party(accountId = accountId, contactId = contactId, role = role, bookId = bookId)))
+        w.insert(T_PARTIES, null, MoneyDb.values(Party(accountId = accountId, contactId = contactId, role = role, bookId = bookId, creditDays = creditDays)))
     }
 
-    suspend fun updateParty(party: Party, contact: Contact, role: PartyRole, bookId: Long, opening: Long) = write { w ->
+    suspend fun updateParty(party: Party, contact: Contact, role: PartyRole, bookId: Long, opening: Long, creditDays: Int = party.creditDays) = write { w ->
         val contactId = saveContactIn(w, contact)
-        w.update(T_PARTIES, MoneyDb.values(party.copy(contactId = contactId, role = role, bookId = bookId)), "id = ?", arrayOf(party.id.toString()))
+        w.update(T_PARTIES, MoneyDb.values(party.copy(contactId = contactId, role = role, bookId = bookId, creditDays = creditDays)), "id = ?", arrayOf(party.id.toString()))
         w.execSQL(
             "UPDATE $T_ACCOUNTS SET name = ?, book_id = ?, opening = ? WHERE id = ?",
             arrayOf<Any?>(uniqueAccountName(w, contact.name.trim(), party.accountId), bookId, opening, party.accountId),
@@ -430,9 +454,35 @@ class MoneyRepository(private val context: Context) {
         else w.update(T_TXNS, MoneyDb.values(t.copy(id = existing.id, createdAt = existing.createdAt)), "id = ?", arrayOf(existing.id.toString()))
     }
 
+
+    /**
+     * Repeats a party entry: monthly rent from a tenant, a weekly milk bill. The first one is on [start]; the
+     * repeating-entries engine adds each one on its date, like any other repeating entry.
+     */
+    suspend fun savePartyRule(
+        party: Party, gave: Boolean, amount: Long, start: LocalDate, accountId: Long?, categoryId: Long?, note: String, frequency: com.saraltechies.saralmoneytracker.model.Frequency,
+    ) {
+        val rule = when {
+            categoryId != null -> Recurring(
+                type = if (gave) TxnType.INCOME else TxnType.EXPENSE, amount = amount, categoryId = categoryId, accountId = party.accountId,
+                note = note.trim(), frequency = frequency, startDate = start, nextDate = start,
+            )
+            gave -> Recurring(
+                type = TxnType.TRANSFER, amount = amount, categoryId = null, accountId = accountId ?: return, toAccountId = party.accountId,
+                note = note.trim(), frequency = frequency, startDate = start, nextDate = start,
+            )
+            else -> Recurring(
+                type = TxnType.TRANSFER, amount = amount, categoryId = null, accountId = party.accountId, toAccountId = accountId ?: return,
+                note = note.trim(), frequency = frequency, startDate = start, nextDate = start,
+            )
+        }
+        saveRecurring(rule)
+        processRecurring()
+    }
     /** Deletes a customer or supplier with every entry; sales and purchases recorded with them go too. */
     suspend fun deleteParty(party: Party) = write { w ->
         w.delete(T_TXNS, "account_id = ? OR to_account_id = ?", arrayOf(party.accountId.toString(), party.accountId.toString()))
+        w.delete(T_RECURRING, "account_id = ? OR to_account_id = ?", arrayOf(party.accountId.toString(), party.accountId.toString()))
         w.delete(T_PARTIES, "id = ?", arrayOf(party.id.toString()))
         w.delete(T_ACCOUNTS, "id = ?", arrayOf(party.accountId.toString()))
         party.contactId?.let { deleteContactIfUnused(w, it) }
@@ -832,7 +882,7 @@ class MoneyRepository(private val context: Context) {
             val accountId = account(p.name, AccountType.PARTY, book = book)
             if (partiesByAccount.containsKey(accountId)) continue
             val contactId = (p.contact ?: p.name).let { contactIds[key(it)] } ?: w.insert(T_CONTACTS, null, MoneyDb.values(Contact(name = p.name)))
-            val party = Party(accountId = accountId, contactId = contactId, role = p.role, bookId = book)
+            val party = Party(accountId = accountId, contactId = contactId, role = p.role, bookId = book, creditDays = p.creditDays)
             partiesByAccount[accountId] = party.copy(id = w.insert(T_PARTIES, null, MoneyDb.values(party)))
         }
         fun loanOf(row: com.saraltechies.saralmoneytracker.xlsx.ImportedRow, from: Long, to: Long?): Long? =
@@ -895,7 +945,7 @@ class MoneyRepository(private val context: Context) {
                 categoryId = if (r.type == TxnType.TRANSFER) null else category(r.category, r.type, book = bookOf(r.book)),
                 accountId = r.account?.let { account(it, book = bookOf(r.book)) } ?: options.defaultAccountId,
                 toAccountId = r.toAccount?.let { account(it, book = bookOf(r.book)) },
-                note = r.note, frequency = r.frequency, startDate = r.startDate, nextDate = r.nextDate, endDate = r.endDate, active = r.active,
+                note = r.note, frequency = r.frequency, startDate = r.startDate, nextDate = r.nextDate, endDate = r.endDate, active = r.active, remindDays = r.remindDays,
             )
             if (existingRules.any { it.copy(id = 0) == rule }) continue
             w.insert(T_RECURRING, null, MoneyDb.values(rule))

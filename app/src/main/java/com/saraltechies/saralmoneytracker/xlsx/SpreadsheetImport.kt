@@ -47,7 +47,7 @@ data class ImportedLoan(
     val book: String? = null,
 )
 
-data class ImportedParty(val name: String, val role: PartyRole, val contact: String?, val book: String?)
+data class ImportedParty(val name: String, val role: PartyRole, val contact: String?, val book: String?, val creditDays: Int = 0)
 
 data class ImportedAccount(val name: String, val type: AccountType, val opening: Long, val archived: Boolean = false, val book: String? = null)
 
@@ -73,6 +73,7 @@ data class ImportedRecurring(
     val endDate: LocalDate?,
     val active: Boolean,
     val book: String? = null,
+    val remindDays: Int = 0,
 )
 
 data class ImportResult(
@@ -185,6 +186,7 @@ object SpreadsheetImport {
                     nextDate = date(s.cell(r, h["next date"] ?: -1)) ?: start,
                     endDate = date(s.cell(r, h["end date"] ?: -1)),
                     active = !text(s, r, h["paused"]).equals("yes", true),
+                    remindDays = text(s, r, h["remind days before"]).toIntOrNull() ?: 0,
                     book = text(s, r, h["book"]).ifEmpty { null },
                 )
             }
@@ -234,7 +236,10 @@ object SpreadsheetImport {
             val h = headerIndex(s, 0)
             (1..s.lastRow).mapNotNull { r ->
                 val name = text(s, r, h["name"]).ifEmpty { return@mapNotNull null }
-                ImportedParty(name, BackupFormat.parseRole(text(s, r, h["role"])), text(s, r, h["contact"]).ifEmpty { null }, text(s, r, h["book"]).ifEmpty { null })
+                ImportedParty(
+                    name, BackupFormat.parseRole(text(s, r, h["role"])), text(s, r, h["contact"]).ifEmpty { null }, text(s, r, h["book"]).ifEmpty { null },
+                    text(s, r, h["credit days"]).toIntOrNull() ?: 0,
+                )
             }
         }.orEmpty()
         return ImportResult(

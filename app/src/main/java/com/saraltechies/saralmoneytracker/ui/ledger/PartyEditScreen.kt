@@ -74,6 +74,8 @@ fun PartyEditScreen(
     var openingText by rememberSaveable { mutableStateOf("") }
     // True: they owe you this old balance; false: you owe them.
     var theyOwe by rememberSaveable { mutableStateOf(initialRole == PartyRole.CUSTOMER) }
+    // Days of credit; each bill is due this long after it. 0: no due dates.
+    var creditDays by rememberSaveable { mutableStateOf(0) }
     var error by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) {
@@ -82,6 +84,7 @@ fun PartyEditScreen(
         existing = item
         if (loaded) return@LaunchedEffect
         role = item.party.role
+        creditDays = item.party.creditDays
         bookId = item.party.bookId
         contact = item.contact ?: Contact(name = item.name)
         openingText = if (item.opening != 0L) Money.plain(kotlin.math.abs(item.opening)) else ""
@@ -102,9 +105,9 @@ fun PartyEditScreen(
         val signed = if (theyOwe) opening else -opening
         scope.launch {
             val item = existing
-            if (item == null) onSaved(repository.createParty(contact, role, bookId, signed))
+            if (item == null) onSaved(repository.createParty(contact, role, bookId, signed, creditDays))
             else {
-                repository.updateParty(item.party, contact, role, bookId, signed)
+                repository.updateParty(item.party, contact, role, bookId, signed, creditDays)
                 onBack()
             }
         }
@@ -147,6 +150,27 @@ fun PartyEditScreen(
                         nameLabel = stringResource(if (role == PartyRole.CUSTOMER) R.string.ledger_customer_name else R.string.ledger_supplier_name),
                     )
                 }
+                Text(
+                    stringResource(R.string.ledger_credit_days), style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp),
+                )
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                ) {
+                    items(listOf(0, 7, 15, 30, 45, 60).size) { i ->
+                        val d = listOf(0, 7, 15, 30, 45, 60)[i]
+                        FilterChip(
+                            selected = creditDays == d, onClick = { creditDays = d },
+                            label = { Text(if (d == 0) stringResource(R.string.ledger_no_due_dates) else stringResource(R.string.ledger_days, d)) },
+                        )
+                    }
+                }
+                Text(
+                    stringResource(if (role == PartyRole.CUSTOMER) R.string.ledger_credit_days_hint_customer else R.string.ledger_credit_days_hint_supplier),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
                 Text(
                     stringResource(R.string.ledger_old_balance), style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp),

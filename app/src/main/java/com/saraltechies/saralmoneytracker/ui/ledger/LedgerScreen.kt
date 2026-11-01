@@ -24,6 +24,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,11 +51,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.data.MoneyRepository
 import com.saraltechies.saralmoneytracker.data.PartyItem
+import com.saraltechies.saralmoneytracker.model.Ledgers
 import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.ui.components.Dates
 import com.saraltechies.saralmoneytracker.ui.components.EmptyState
 import com.saraltechies.saralmoneytracker.ui.components.money
 import com.saraltechies.saralmoneytracker.ui.theme.AppTheme
+import java.time.LocalDate
 
 /** Customers who buy on credit and suppliers you buy from on credit, with what each owes or is owed. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +71,7 @@ fun LedgerScreen(
     val items by remember { repository.watch { repository.partyItems() } }.collectAsStateWithLifecycle(null)
     var role by rememberSaveable { mutableStateOf(PartyRole.CUSTOMER) }
     var query by rememberSaveable { mutableStateOf("") }
+    var overdueOnly by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -87,7 +91,11 @@ fun LedgerScreen(
         val all = items ?: return@Scaffold
         val toGet = all.sumOf { it.balance.coerceAtLeast(0) }
         val toGive = -all.sumOf { it.balance.coerceAtMost(0) }
-        val shown = all.filter { it.party.role == role && (query.isBlank() || it.name.contains(query.trim(), true) || it.contact?.phone?.contains(query.trim()) == true) }
+        val today = LocalDate.now()
+        val dues = all.associate { it.party.id to Ledgers.dues(it.party, it.entries, today) }
+        val overdueCount = all.count { (dues[it.party.id]?.overdue ?: 0) > 0 }
+        val shown = all.filter { if (overdueOnly) (dues[it.party.id]?.overdue ?: 0) > 0 else it.party.role == role }
+            .filter { query.isBlank() || it.name.contains(query.trim(), true) || it.contact?.phone?.contains(query.trim()) == true }
             .sortedWith(compareByDescending<PartyItem> { kotlin.math.abs(it.balance) }.thenBy { it.name.lowercase() })
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 88.dp)) {
             item {
@@ -136,13 +144,22 @@ fun LedgerScreen(
                     )
                 }
             }
-            items(shown, key = { it.party.id }) { PartyRow(it) { onOpen(it.party.id) } }
+            if (overdueCount > 0) {
+                item {
+                    FilterChip(
+                        selected = overdueOnly, onClick = { overdueOnly = !overdueOnly },
+                        label = { Text(stringResource(R.string.ledger_overdue_filter, overdueCount)) },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
+            items(shown, key = { it.party.id }) { PartyRow(it, dues[it.party.id]?.overdue ?: 0) { onOpen(it.party.id) } }
         }
     }
 }
 
 @Composable
-fun PartyRow(item: PartyItem, onClick: () -> Unit) {
+fun PartyRow(item: PartyItem, overdue: Long = 0, onClick: () -> Unit) {
     val b = item.balance
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
@@ -152,8 +169,9 @@ fun PartyRow(item: PartyItem, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(item.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                item.lastDate?.let { Dates.relative(it) } ?: stringResource(R.string.ledger_no_entries),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                if (overdue > 0) stringResource(R.string.ledger_overdue_amount, money(overdue))
+                else item.lastDate?.let { Dates.relative(it) } ?: stringResource(R.string.ledger_no_entries),
+                style = MaterialTheme.typography.bodySmall, color = if (overdue > 0) AppTheme.money.expense else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Column(horizontalAlignment = Alignment.End) {

@@ -47,6 +47,12 @@ data class AppPrefs(
     val setupDone: Boolean = false,
     /** The "What's new" version last shown. */
     val whatsNewSeen: Int = 0,
+    /** Morning alerts: bills coming up, loan and credit payments due today. */
+    val alertsOn: Boolean = true,
+    /** A summary of last month on the first morning of a new one. */
+    val monthlySummaryOn: Boolean = true,
+    /** The month (epoch day of its first day) the last summary was for, so it's sent once. */
+    val lastSummaryFor: Long = 0,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -67,6 +73,9 @@ class SettingsRepository(private val context: Context) {
     private val lastBackupErrorKey = stringPreferencesKey("last_backup_error")
     private val setupDoneKey = booleanPreferencesKey("setup_done")
     private val whatsNewSeenKey = intPreferencesKey("whats_new_seen")
+    private val alertsOnKey = booleanPreferencesKey("alerts_on")
+    private val monthlySummaryKey = booleanPreferencesKey("monthly_summary")
+    private val lastSummaryForKey = longPreferencesKey("last_summary_for")
     private val goodMomentsKey = intPreferencesKey("good_moments")
     private val reviewPromptsKey = intPreferencesKey("review_prompts")
     private val reviewLastAtKey = longPreferencesKey("review_last_at")
@@ -93,6 +102,9 @@ class SettingsRepository(private val context: Context) {
             lastBackupError = p[lastBackupErrorKey],
             setupDone = p[setupDoneKey] ?: false,
             whatsNewSeen = p[whatsNewSeenKey] ?: 0,
+            alertsOn = p[alertsOnKey] ?: true,
+            monthlySummaryOn = p[monthlySummaryKey] ?: true,
+            lastSummaryFor = p[lastSummaryForKey] ?: 0L,
         )
     }.distinctUntilChanged()
 
@@ -122,6 +134,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setSetupDone() = context.dataStore.edit { it[setupDoneKey] = true }
     suspend fun setWhatsNewSeen(version: Int) = context.dataStore.edit { it[whatsNewSeenKey] = version }
+    suspend fun setAlerts(on: Boolean) = context.dataStore.edit { it[alertsOnKey] = on }
+    suspend fun setMonthlySummary(on: Boolean) = context.dataStore.edit { it[monthlySummaryKey] = on }
+    suspend fun setLastSummaryFor(monthStart: Long) = context.dataStore.edit { it[lastSummaryForKey] = monthStart }
     suspend fun setBook(id: Long) {
         context.dataStore.edit { it[bookKey] = id }
         com.saraltechies.saralmoneytracker.util.Widgets.requestUpdate(context)

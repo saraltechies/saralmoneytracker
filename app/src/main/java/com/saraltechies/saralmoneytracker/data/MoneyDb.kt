@@ -65,6 +65,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         )
         createBooks(db)
         createParties(db)
+        addDueDates(db)
         seed(db)
     }
 
@@ -87,6 +88,13 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         }
         if (oldVersion < 4) createBooks(db)
         if (oldVersion < 5) createParties(db)
+        if (oldVersion < 6) addDueDates(db)
+    }
+
+    /** Version 6: reminders before repeating entries are due, and credit days for customers and suppliers. */
+    private fun addDueDates(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE recurring ADD COLUMN remind_days INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE parties ADD COLUMN credit_days INTEGER NOT NULL DEFAULT 0")
     }
 
     /** Version 5: the credit ledger. Each customer or supplier has a hidden PARTY account holding what they owe. */
@@ -149,7 +157,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
 
     companion object {
         const val NAME = "money.db"
-        const val VERSION = 5
+        const val VERSION = 6
         const val T_ACCOUNTS = "accounts"
         const val T_CATEGORIES = "categories"
         const val T_TXNS = "txns"
@@ -208,6 +216,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("next_day", r.nextDate.toEpochDay())
             if (r.endDate != null) put("end_day", r.endDate.toEpochDay()) else putNull("end_day")
             put("active", if (r.active) 1 else 0)
+            put("remind_days", r.remindDays)
         }
 
         fun values(l: Loan) = ContentValues().apply {
@@ -297,6 +306,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             put("account_id", p.accountId)
             if (p.contactId != null) put("contact_id", p.contactId) else putNull("contact_id")
             put("role", p.role.name)
+            put("credit_days", p.creditDays)
             put("book_id", p.bookId)
             put("created", if (p.createdAt != 0L) p.createdAt else System.currentTimeMillis())
         }
@@ -306,6 +316,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             accountId = c.long("account_id"),
             contactId = c.longOrNull("contact_id"),
             role = if (c.str("role") == PartyRole.SUPPLIER.name) PartyRole.SUPPLIER else PartyRole.CUSTOMER,
+            creditDays = c.int("credit_days"),
             bookId = c.long("book_id"),
             createdAt = c.long("created"),
         )
@@ -364,6 +375,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             nextDate = LocalDate.ofEpochDay(c.long("next_day")),
             endDate = c.longOrNull("end_day")?.let(LocalDate::ofEpochDay),
             active = c.int("active") != 0,
+            remindDays = c.int("remind_days"),
         )
     }
 }

@@ -20,6 +20,8 @@ data class Party(
     val role: PartyRole,
     val bookId: Long = Books.PERSONAL_ID,
     val createdAt: Long = 0,
+    /** Days of credit: each sale (or purchase) on credit is due this many days later; 0 for no due dates. */
+    val creditDays: Int = 0,
 )
 
 enum class LedgerKind {
@@ -96,4 +98,58 @@ object Ledgers {
             else -> null
         }
     }
+
+    /**
+     * What a party has to pay (customer) or be paid (supplier), bill by bill. Each charge (goods or money given to a
+     * customer; goods bought from a supplier) is due [Party.creditDays] after its date, and payments settle the
+     * oldest charges first. The old balance is due at once.
+     */
+    fun dues(party: Party, entries: List<LedgerEntry>, today: LocalDate): LedgerDues {
+        if (party.creditDays <= 0) return LedgerDues(0, 0, null, emptyList())
+        // For a customer, charges raise the balance; for a supplier, they lower it.
+        val sign = if (party.role == PartyRole.CUSTOMER) 1 else -1
+        val open = ArrayDeque<Pair<LocalDate, Long>>()
+        var credit = 0L
+        for (e in entries) {
+            val change = e.change * sign
+            if (change > 0) {
+                val due = if (e.kind == LedgerKind.OPENING) e.date else e.date.plusDays(party.creditDays.toLong())
+                var amount = change
+                // An advance paid earlier settles this charge first.
+                val used = minOf(credit, amount)
+                credit -= used
+                amount -= used
+                if (amount > 0) open.addLast(due to amount)
+            } else if (change < 0) {
+                var pay = -change
+                while (pay > 0 && open.isNotEmpty()) {
+                    val (due, amount) = open.removeFirst()
+                    if (amount > pay) {
+                        open.addFirst(due to amount - pay)
+                        pay = 0
+                    } else {
+                        pay -= amount
+                    }
+                }
+                credit += pay
+            }
+        }
+        val bills = open.sortedBy { it.first }
+        return LedgerDues(
+            overdue = bills.filter { it.first.isBefore(today) }.sumOf { it.second },
+            dueToday = bills.filter { it.first == today }.sumOf { it.second },
+            next = bills.firstOrNull { !it.first.isBefore(today) },
+            bills = bills,
+        )
+    }
+}
+
+/** A party's unpaid bills by due date: what's late, what's due today and the next one coming. */
+data class LedgerDues(
+    val overdue: Long,
+    val dueToday: Long,
+    val next: Pair<LocalDate, Long>?,
+    val bills: List<Pair<LocalDate, Long>>,
+) {
+    val oldestOverdue: LocalDate? get() = bills.firstOrNull()?.first?.takeIf { overdue > 0 }
 }

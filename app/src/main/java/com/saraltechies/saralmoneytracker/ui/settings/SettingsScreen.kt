@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Store
@@ -85,6 +86,7 @@ import com.saraltechies.saralmoneytracker.ui.components.currencyName
 import com.saraltechies.saralmoneytracker.util.AppLock
 import com.saraltechies.saralmoneytracker.util.PlayStore
 import com.saraltechies.saralmoneytracker.util.Reminders
+import com.saraltechies.saralmoneytracker.util.Alerts
 import com.saraltechies.saralmoneytracker.xlsx.BackupFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -133,6 +135,10 @@ fun SettingsScreen(
         }
     }
 
+    // For alerts and the monthly summary: they stay on; without permission Android just won't show them.
+    val alertsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) notify(R.string.reminder_permission_denied)
+    }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) setReminder(true) else notify(R.string.reminder_permission_denied)
     }
@@ -203,6 +209,24 @@ fun SettingsScreen(
                 item {
                     val time = LocalTime.of(prefs.reminderMinute / 60, prefs.reminderMinute % 60)
                     Setting(Icons.Filled.Alarm, stringResource(R.string.reminder_time), time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))) { picker = Picker.TIME }
+                }
+            }
+            item {
+                SwitchSetting(Icons.Filled.NotificationsActive, stringResource(R.string.alerts_setting), stringResource(R.string.alerts_setting_summary), prefs.alertsOn) { on ->
+                    if (on && Build.VERSION.SDK_INT >= 33 && !Reminders.canNotify(context)) alertsPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    scope.launch {
+                        settings.setAlerts(on)
+                        Alerts.schedule(context, on || prefs.monthlySummaryOn)
+                    }
+                }
+            }
+            item {
+                SwitchSetting(Icons.Filled.CalendarMonth, stringResource(R.string.summary_setting), stringResource(R.string.summary_setting_summary), prefs.monthlySummaryOn) { on ->
+                    if (on && Build.VERSION.SDK_INT >= 33 && !Reminders.canNotify(context)) alertsPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    scope.launch {
+                        settings.setMonthlySummary(on)
+                        Alerts.schedule(context, on || prefs.alertsOn)
+                    }
                 }
             }
 

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Button
@@ -141,12 +142,15 @@ fun EditScreen(
     var bookId by rememberSaveable { mutableStateOf(books.defaultBook) }
     var bookChanged by remember { mutableStateOf(false) }
     var repeat by rememberSaveable { mutableStateOf<Frequency?>(null) }
+    // Bills: a reminder this many days before each date (0 for none).
+    var remindDays by rememberSaveable { mutableStateOf(0) }
     var original by remember { mutableStateOf<Txn?>(null) }
     var originalRule by remember { mutableStateOf<Recurring?>(null) }
     var error by remember { mutableStateOf<Int?>(null) }
     var pickDate by remember { mutableStateOf(false) }
     var pickAccount by remember { mutableStateOf(0) } // 1 from, 2 to
     var pickRepeat by remember { mutableStateOf(false) }
+    var pickRemind by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val date = LocalDate.ofEpochDay(dateDay)
     val isRule = ruleId != 0L
@@ -164,14 +168,15 @@ fun EditScreen(
         // Categories and accounts of every book, read now: the lists on screen may not have arrived yet.
         val allCats = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.categories(true, book = Books.ALL) }
         val allAccs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.accounts(true, book = Books.ALL) }
-        val partyId = txn?.let { t ->
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                (repository.partyForAccount(t.accountId) ?: t.toAccountId?.let { repository.partyForAccount(it) })?.id
-            }
+        // An entry or repeating entry with a customer or supplier belongs on their page.
+        val partyId = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val from = txn?.accountId ?: rule?.accountId
+            val to = txn?.toAccountId ?: rule?.toAccountId
+            (from?.let { repository.partyForAccount(it) } ?: to?.let { repository.partyForAccount(it) })?.id
         }
         when {
             // Entries with a customer or supplier are changed on their page, where the running balance is.
-            txn != null && partyId != null -> {
+            partyId != null -> {
                 onOpenParty(partyId)
                 return@LaunchedEffect
             }
@@ -202,6 +207,7 @@ fun EditScreen(
                 dateDay = rule.nextDate.toEpochDay()
                 note = rule.note
                 repeat = rule.frequency
+                remindDays = rule.remindDays
             }
             else -> {
                 val own = recent.filter { it.loanId == null }
@@ -262,7 +268,7 @@ fun EditScreen(
                 val rule = Recurring(
                     id = base?.id ?: 0, type = type, amount = value, categoryId = cat, accountId = accountId!!, toAccountId = to,
                     note = note.trim(), frequency = frequency ?: Frequency.MONTHLY, startDate = date, nextDate = date,
-                    endDate = base?.endDate, active = base?.active ?: true,
+                    endDate = base?.endDate, active = base?.active ?: true, remindDays = remindDays,
                 )
                 repository.saveRecurring(rule)
                 repository.processRecurring()
@@ -354,6 +360,9 @@ fun EditScreen(
                         repeat?.let { stringResource(frequencyLabel(it)) } ?: stringResource(R.string.repeat_never),
                         onClick = { pickRepeat = true },
                     )
+                    if (repeat != null || isRule) {
+                        PickerRow(Icons.Filled.NotificationsActive, stringResource(R.string.remind_me), remindLabel(remindDays), onClick = { pickRemind = true })
+                    }
                 }
                 OutlinedTextField(
                     value = note,
@@ -400,6 +409,16 @@ fun EditScreen(
             onSelect = { categoryId = it; error = null },
             onManage = { allCategories = false; onManageCategories() },
             onDismiss = { allCategories = false },
+        )
+    }
+    if (pickRemind) {
+        ChoiceDialog(
+            title = stringResource(R.string.remind_me),
+            options = listOf(0, 1, 2, 3, 7),
+            selected = remindDays,
+            label = { d -> remindLabel(d) },
+            onPick = { remindDays = it },
+            onDismiss = { pickRemind = false },
         )
     }
     if (pickRepeat) {
@@ -596,3 +615,7 @@ private fun AccountRows(
         )
     }
 }
+
+@Composable
+private fun remindLabel(days: Int): String =
+    if (days <= 0) stringResource(R.string.remind_off) else androidx.compose.ui.res.pluralStringResource(R.plurals.remind_days_before, days, days)

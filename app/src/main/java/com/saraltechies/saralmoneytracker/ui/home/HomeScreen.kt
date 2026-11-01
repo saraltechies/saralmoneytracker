@@ -95,6 +95,7 @@ private class HomeData(
     val lookups: Lookups = Lookups(emptyList(), emptyList()),
     val loans: List<com.saraltechies.saralmoneytracker.data.LoanItem> = emptyList(),
     val parties: List<com.saraltechies.saralmoneytracker.data.PartyItem> = emptyList(),
+    val forecast: com.saraltechies.saralmoneytracker.model.CashForecast? = null,
     val loaded: Boolean = false,
 )
 
@@ -118,6 +119,7 @@ fun HomeScreen(
     onImport: () -> Unit,
     onOpenLoans: () -> Unit,
     onOpenLedger: () -> Unit,
+    onOpenForecast: () -> Unit,
     onOpenLoan: (Long) -> Unit,
     onSelectBook: (Long) -> Unit,
     onManageBooks: () -> Unit,
@@ -157,6 +159,7 @@ fun HomeScreen(
                 lookups = Lookups(categories, accounts, repository.loanDirections(), repository.books()),
                 loans = repository.loanItems(today).filter { !it.loan.closed },
                 parties = repository.partyItems(),
+                forecast = repository.forecast(month.end),
                 loaded = true,
             )
         }
@@ -211,6 +214,9 @@ fun HomeScreen(
                 )
             }
             item { BudgetCard(data.budget, onOpenBudgets) }
+            data.forecast?.takeIf { it.items.isNotEmpty() }?.let { f ->
+                item { ForecastCard(f, onOpenForecast) }
+            }
 
             if (data.parties.isNotEmpty()) {
                 item {
@@ -465,6 +471,37 @@ private fun UpdateBanner(onRestart: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Text(stringResource(R.string.update_ready), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = onRestart) { Text(stringResource(R.string.restart)) }
+        }
+    }
+}
+
+/** "By 30 Nov you'll have about ₹X": where this month is heading, with what's still to come in and go out. */
+@Composable
+private fun ForecastCard(f: com.saraltechies.saralmoneytracker.model.CashForecast, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.forecast_card_title, Dates.short(f.to)), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Text(
+                    money(f.endBalance), fontWeight = FontWeight.SemiBold,
+                    color = if (f.endBalance < 0) AppTheme.money.expense else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Text(
+                stringResource(R.string.forecast_card_text, money(f.moneyIn), money(f.moneyOut)),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val (lowDate, low) = f.lowest
+            if (low < 0) {
+                Text(
+                    stringResource(R.string.forecast_low_negative, money(low), Dates.relative(lowDate)),
+                    style = MaterialTheme.typography.bodySmall, color = AppTheme.money.expense,
+                )
+            }
         }
     }
 }

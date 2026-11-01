@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Store
@@ -33,14 +35,16 @@ import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.ui.components.IconBadge
 
 /** Bump this with each release that has something worth showing; it is shown once to people updating. */
-const val WHATS_NEW_VERSION = 6
+const val WHATS_NEW_VERSION = 7
 
 /** Where a "What's new" item takes you. */
-enum class WhatsNewTarget { BOOKS, LEDGER, LOANS, BACKUP, NONE }
+enum class WhatsNewTarget { BOOKS, LEDGER, LOANS, BACKUP, FORECAST, NONE }
 
 private data class Item(val icon: ImageVector, val title: Int, val text: Int, val target: WhatsNewTarget, val action: Int?)
 
 private val items = listOf(
+    Item(Icons.AutoMirrored.Filled.TrendingUp, R.string.whatsnew_forecast_title, R.string.whatsnew_forecast_text, WhatsNewTarget.FORECAST, R.string.whatsnew_open),
+    Item(Icons.Filled.NotificationsActive, R.string.whatsnew_alerts_title, R.string.whatsnew_alerts_text, WhatsNewTarget.LEDGER, R.string.whatsnew_alerts_action),
     Item(Icons.Filled.Backup, R.string.whatsnew_backup_title, R.string.whatsnew_backup_text, WhatsNewTarget.BACKUP, R.string.whatsnew_backup_action),
     Item(Icons.Filled.Store, R.string.whatsnew_books_title, R.string.whatsnew_books_text, WhatsNewTarget.BOOKS, R.string.whatsnew_books_action),
     Item(Icons.Filled.Storefront, R.string.whatsnew_ledger_title, R.string.whatsnew_ledger_text, WhatsNewTarget.LEDGER, R.string.whatsnew_open),

@@ -65,6 +65,8 @@ data class Txn(
     val createdAt: Long = 0,
     /** Set on entries that belong to a [Loan]: money given, paid back, or interest. */
     val loanId: Long? = null,
+    /** Set on entries that belong to a [Bill]: its sale, its GST, or a payment against it. */
+    val billId: Long? = null,
 )
 
 /** A repeating entry (salary, rent, EMI, SIP, subscriptions). Due copies are added automatically. */

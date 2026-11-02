@@ -1,6 +1,8 @@
 package com.saraltechies.saralmoneytracker.xlsx
 
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.BillItem
+import com.saraltechies.saralmoneytracker.model.BillMath
 import com.saraltechies.saralmoneytracker.model.Book
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.Frequency
@@ -30,6 +32,8 @@ data class ImportedRow(
     val loan: String? = null,
     /** The book its category belongs to, from our own export. */
     val book: String? = null,
+    /** The number of the bill this entry belongs to, from our own export. */
+    val bill: String? = null,
 )
 
 data class ImportedLoan(
@@ -47,6 +51,21 @@ data class ImportedLoan(
     val contact: String? = null,
     val book: String? = null,
     val pledge: Pledge? = null,
+)
+
+data class ImportedBill(
+    val number: String,
+    val date: LocalDate,
+    /** The customer's account name; null for a walk-in sale. */
+    val customer: String?,
+    val name: String,
+    val account: String?,
+    val discount: Long,
+    val pricesIncludeGst: Boolean,
+    val interState: Boolean,
+    val note: String,
+    val book: String?,
+    val items: List<BillItem>,
 )
 
 data class ImportedParty(val name: String, val role: PartyRole, val contact: String?, val book: String?, val creditDays: Int = 0)
@@ -99,6 +118,7 @@ data class ImportResult(
     val books: List<Book> = emptyList(),
     /** Customers and suppliers of the credit ledger, by their account name. */
     val parties: List<ImportedParty> = emptyList(),
+    val bills: List<ImportedBill> = emptyList(),
 ) {
     val isEmpty: Boolean get() = rows.isEmpty() && accounts.isEmpty() && categories.isEmpty() && recurring.isEmpty() && loans.isEmpty() && contacts.isEmpty()
 }
@@ -141,6 +161,7 @@ object SpreadsheetImport {
                     toAccount = text(s, r, h["to account"]).ifEmpty { null },
                     loan = text(s, r, h["loan"]).ifEmpty { null },
                     book = text(s, r, h["book"]).ifEmpty { null },
+                    bill = text(s, r, h["bill"]).ifEmpty { null },
                 )
             }
         }
@@ -254,9 +275,35 @@ object SpreadsheetImport {
                 )
             }
         }.orEmpty()
+        val billItems = sheet(BackupFormat.SHEET_BILL_ITEMS)?.let { s ->
+            val h = headerIndex(s, 0)
+            (1..s.lastRow).mapNotNull { r ->
+                val number = text(s, r, h["bill"]).ifEmpty { return@mapNotNull null }
+                val name = text(s, r, h["item"]).ifEmpty { return@mapNotNull null }
+                (text(s, r, h["book"]).lowercase(Locale.ROOT) + "|" + number.lowercase(Locale.ROOT)) to BillItem(
+                    name = name, quantity = BillMath.parseQuantity(text(s, r, h["quantity"])) ?: 1000, unit = text(s, r, h["unit"]),
+                    rate = amount(s.cell(r, h["rate"] ?: -1))?.absoluteValue ?: 0, gstRate = amount(s.cell(r, h["gst %"] ?: -1))?.absoluteValue ?: 0, hsn = text(s, r, h["hsn"]),
+                )
+            }.groupBy({ it.first }, { it.second })
+        }.orEmpty()
+        val bills = sheet(BackupFormat.SHEET_BILLS)?.let { s ->
+            val h = headerIndex(s, 0)
+            (1..s.lastRow).mapNotNull { r ->
+                val number = text(s, r, h["number"]).ifEmpty { return@mapNotNull null }
+                val book = text(s, r, h["book"])
+                ImportedBill(
+                    number = number, date = date(s.cell(r, h["date"] ?: -1)) ?: return@mapNotNull null,
+                    customer = text(s, r, h["customer"]).ifEmpty { null }, name = text(s, r, h["walk-in name"]), account = text(s, r, h["account"]).ifEmpty { null },
+                    discount = amount(s.cell(r, h["discount"] ?: -1))?.absoluteValue ?: 0,
+                    pricesIncludeGst = text(s, r, h["prices include gst"]).equals("yes", true), interState = text(s, r, h["other state"]).equals("yes", true),
+                    note = text(s, r, h["note"]), book = book.ifEmpty { null },
+                    items = billItems[book.lowercase(Locale.ROOT) + "|" + number.lowercase(Locale.ROOT)].orEmpty(),
+                )
+            }
+        }.orEmpty()
         return ImportResult(
             unique, accounts, categories, recurring, duplicates, skipped, sheets.map { it.name }, isBackup = true, loans = loans,
-            contacts = contactRows.map { it.first }, contactBooks = contactRows.map { it.second }, books = books, parties = parties,
+            contacts = contactRows.map { it.first }, contactBooks = contactRows.map { it.second }, books = books, parties = parties, bills = bills,
         )
     }
 

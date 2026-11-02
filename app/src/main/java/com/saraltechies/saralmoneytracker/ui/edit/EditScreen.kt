@@ -124,6 +124,7 @@ fun EditScreen(
     onManageCategories: () -> Unit,
     onOpenLoan: (Long) -> Unit,
     onOpenParty: (Long) -> Unit,
+    onOpenBill: (Long) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
@@ -175,6 +176,11 @@ fun EditScreen(
             (from?.let { repository.partyForAccount(it) } ?: to?.let { repository.partyForAccount(it) })?.id
         }
         when {
+            // A bill's entries are changed on the bill, so its items and totals stay right.
+            txn?.billId != null -> {
+                onOpenBill(txn.billId)
+                return@LaunchedEffect
+            }
             // Entries with a customer or supplier are changed on their page, where the running balance is.
             partyId != null -> {
                 onOpenParty(partyId)

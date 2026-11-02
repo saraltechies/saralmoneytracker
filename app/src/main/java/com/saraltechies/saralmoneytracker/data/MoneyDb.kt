@@ -8,6 +8,8 @@ import android.database.sqlite.SQLiteOpenHelper
 import com.saraltechies.saralmoneytracker.R
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Bill
+import com.saraltechies.saralmoneytracker.model.BillItem
 import com.saraltechies.saralmoneytracker.model.Book
 import com.saraltechies.saralmoneytracker.model.BookKind
 import com.saraltechies.saralmoneytracker.model.Books
@@ -69,6 +71,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         createParties(db)
         addDueDates(db)
         addPledges(db)
+        createBills(db)
         seed(db)
     }
 
@@ -93,6 +96,25 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         if (oldVersion < 5) createParties(db)
         if (oldVersion < 6) addDueDates(db)
         if (oldVersion < 7) addPledges(db)
+        if (oldVersion < 8) createBills(db)
+    }
+
+    /** Version 8: bills for what a shop sells. Their entries in txns point back with bill_id. */
+    private fun createBills(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE bills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, number TEXT NOT NULL, day INTEGER NOT NULL, book_id INTEGER NOT NULL,
+                party_id INTEGER, customer_name TEXT NOT NULL DEFAULT '', account_id INTEGER, discount INTEGER NOT NULL DEFAULT 0,
+                prices_include_gst INTEGER NOT NULL DEFAULT 0, inter_state INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL)""",
+        )
+        db.execSQL(
+            """CREATE TABLE bill_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, bill_id INTEGER NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL,
+                unit TEXT NOT NULL DEFAULT '', rate INTEGER NOT NULL, gst_rate INTEGER NOT NULL DEFAULT 0, hsn TEXT NOT NULL DEFAULT '')""",
+        )
+        db.execSQL("CREATE INDEX bill_items_bill ON bill_items(bill_id)")
+        db.execSQL("ALTER TABLE txns ADD COLUMN bill_id INTEGER")
+        db.execSQL("CREATE INDEX txns_bill ON txns(bill_id)")
     }
 
     /** Version 7: gold, silver or other items kept as security for a loan (girvi). No kind means no pledge. */
@@ -171,7 +193,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
 
     companion object {
         const val NAME = "money.db"
-        const val VERSION = 7
+        const val VERSION = 8
         const val T_ACCOUNTS = "accounts"
         const val T_CATEGORIES = "categories"
         const val T_TXNS = "txns"
@@ -180,6 +202,8 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
         const val T_CONTACTS = "contacts"
         const val T_BOOKS = "books"
         const val T_PARTIES = "parties"
+        const val T_BILLS = "bills"
+        const val T_BILL_ITEMS = "bill_items"
 
         fun values(a: Account) = ContentValues().apply {
             if (a.id != 0L) put("id", a.id)
@@ -215,6 +239,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             if (t.recurringId != null) put("recurring_id", t.recurringId) else putNull("recurring_id")
             put("created", if (t.createdAt != 0L) t.createdAt else System.currentTimeMillis())
             if (t.loanId != null) put("loan_id", t.loanId) else putNull("loan_id")
+            if (t.billId != null) put("bill_id", t.billId) else putNull("bill_id")
         }
 
         fun values(r: Recurring) = ContentValues().apply {
@@ -314,6 +339,52 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             bookId = c.long("book_id"),
         )
 
+        fun values(b: Bill) = ContentValues().apply {
+            if (b.id != 0L) put("id", b.id)
+            put("number", b.number)
+            put("day", b.date.toEpochDay())
+            put("book_id", b.bookId)
+            if (b.partyId != null) put("party_id", b.partyId) else putNull("party_id")
+            put("customer_name", b.customerName)
+            if (b.accountId != null) put("account_id", b.accountId) else putNull("account_id")
+            put("discount", b.discount)
+            put("prices_include_gst", if (b.pricesIncludeGst) 1 else 0)
+            put("inter_state", if (b.interState) 1 else 0)
+            put("note", b.note)
+            put("created", if (b.createdAt != 0L) b.createdAt else System.currentTimeMillis())
+        }
+
+        fun values(billId: Long, i: BillItem) = ContentValues().apply {
+            put("bill_id", billId)
+            put("name", i.name)
+            put("quantity", i.quantity)
+            put("unit", i.unit)
+            put("rate", i.rate)
+            put("gst_rate", i.gstRate)
+            put("hsn", i.hsn)
+        }
+
+        fun bill(c: Cursor, items: List<BillItem> = emptyList()) = Bill(
+            id = c.long("id"),
+            number = c.str("number"),
+            date = LocalDate.ofEpochDay(c.long("day")),
+            bookId = c.long("book_id"),
+            partyId = c.longOrNull("party_id"),
+            customerName = c.str("customer_name"),
+            accountId = c.longOrNull("account_id"),
+            discount = c.long("discount"),
+            pricesIncludeGst = c.int("prices_include_gst") != 0,
+            interState = c.int("inter_state") != 0,
+            note = c.str("note"),
+            createdAt = c.long("created"),
+            items = items,
+        )
+
+        fun billItem(c: Cursor) = BillItem(
+            name = c.str("name"), quantity = c.long("quantity"), unit = c.str("unit"), rate = c.long("rate"),
+            gstRate = c.long("gst_rate"), hsn = c.str("hsn"),
+        )
+
         fun values(b: Book) = ContentValues().apply {
             if (b.id != 0L) put("id", b.id)
             put("name", b.name)
@@ -387,6 +458,7 @@ class MoneyDb(private val context: Context) : SQLiteOpenHelper(context, NAME, nu
             recurringId = c.longOrNull("recurring_id"),
             createdAt = c.long("created"),
             loanId = c.longOrNull("loan_id"),
+            billId = c.longOrNull("bill_id"),
         )
 
         fun recurring(c: Cursor) = Recurring(

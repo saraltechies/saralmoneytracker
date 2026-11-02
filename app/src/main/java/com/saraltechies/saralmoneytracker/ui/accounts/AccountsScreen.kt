@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -84,6 +85,7 @@ fun AccountsScreen(
     onTransfer: () -> Unit,
     onOpenLoans: () -> Unit,
     onOpenLedger: () -> Unit,
+    onOpenBills: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -184,6 +186,20 @@ fun AccountsScreen(
                             else stringResource(R.string.loans_row_summary, money(toReceive), money(toPay)),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item {
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onOpenBills).padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconBadge(Icons.Filled.Receipt, MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.bills_title), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.bills_row), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

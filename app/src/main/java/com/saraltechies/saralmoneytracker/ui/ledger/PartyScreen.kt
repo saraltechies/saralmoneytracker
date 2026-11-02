@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -110,6 +111,8 @@ fun PartyScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onMyDetails: () -> Unit,
+    onNewBill: () -> Unit = {},
+    onOpenBill: (Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     val currency = LocalCurrency.current
@@ -232,6 +235,15 @@ fun PartyScreen(
                     ) { Text(stringResource(R.string.ledger_you_got), fontWeight = FontWeight.SemiBold) }
                 }
             }
+            if (current.party.role == PartyRole.CUSTOMER) {
+                item {
+                    OutlinedButton(onClick = onNewBill, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        Icon(Icons.Filled.Receipt, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.bill_new))
+                    }
+                }
+            }
             if (b != 0L) {
                 item {
                     OutlinedButton(onClick = { remind = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -272,7 +284,9 @@ fun PartyScreen(
             }
             items(current.entries.reversed(), key = { "e:${it.txnId ?: "opening"}" }) { e ->
                 EntryRow(e, categories.firstOrNull { it.id == e.categoryId }, e.accountId?.let { names[it] }) {
-                    entry = (e.change > 0) to e
+                    // A bill's entries are changed on the bill, so its items and totals stay right.
+                    val bill = e.txnId?.let { id -> current.txns.firstOrNull { it.id == id }?.billId }
+                    if (bill != null) onOpenBill(bill) else entry = (e.change > 0) to e
                 }
             }
         }

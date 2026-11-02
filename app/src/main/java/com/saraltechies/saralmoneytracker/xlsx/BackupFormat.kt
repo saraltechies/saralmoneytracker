@@ -2,6 +2,8 @@ package com.saraltechies.saralmoneytracker.xlsx
 
 import com.saraltechies.saralmoneytracker.model.Account
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Bill
+import com.saraltechies.saralmoneytracker.model.BillMath
 import com.saraltechies.saralmoneytracker.model.Book
 import com.saraltechies.saralmoneytracker.model.BookKind
 import com.saraltechies.saralmoneytracker.model.Books
@@ -40,8 +42,10 @@ object BackupFormat {
     const val SHEET_CONTACTS = "Contacts"
     const val SHEET_BOOKS = "Books"
     const val SHEET_PARTIES = "Credit ledger"
+    const val SHEET_BILLS = "Bills"
+    const val SHEET_BILL_ITEMS = "Bill items"
 
-    private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note", "Loan", "Book")
+    private val TX_HEADER = listOf("Date", "Type", "Amount", "Category", "Account", "To account", "Note", "Loan", "Book", "Bill")
 
     fun isBackupHeader(sheet: XSheet): Boolean {
         val header = sheet.rows[0]?.values?.map { it.text.trim().lowercase(Locale.ROOT) }.orEmpty()
@@ -57,6 +61,7 @@ object BackupFormat {
         val contacts: List<Contact> = emptyList(),
         val books: List<Book> = emptyList(),
         val parties: List<Party> = emptyList(),
+        val bills: List<Bill> = emptyList(),
     )
 
     fun writeXlsx(data: Data, out: OutputStream, exportedOn: LocalDate, appVersion: String) {
@@ -67,16 +72,17 @@ object BackupFormat {
         fun bookOf(id: Long) = if (data.books.size > 1) bookNames[id].orEmpty() else ""
         fun txBook(t: Txn) = bookOf(t.categoryId?.let { cat[it]?.bookId } ?: acc[t.accountId]?.bookId ?: Books.PERSONAL_ID)
         fun loanName(t: Txn) = t.loanId?.let { loanAccounts[it] }.orEmpty()
+        val billNumbers = data.bills.associate { it.id to it.number }
         val w = XlsxWriter()
         w.sheet(
             SHEET_TRANSACTIONS,
             listOf(TX_HEADER) + data.txns.sortedWith(compareBy({ it.date }, { it.createdAt })).map { t ->
                 listOf(
                     t.date, typeName(t.type), MoneyCell(t.amount), t.categoryId?.let { cat[it]?.name }.orEmpty(),
-                    acc[t.accountId]?.name.orEmpty(), t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t), txBook(t),
+                    acc[t.accountId]?.name.orEmpty(), t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t), txBook(t), billNumbers[t.billId].orEmpty(),
                 )
             },
-            widths = listOf(14, 10, 14, 22, 18, 18, 40, 18, 16),
+            widths = listOf(14, 10, 14, 22, 18, 18, 40, 18, 16, 12),
         )
         w.sheet(
             SHEET_ACCOUNTS,
@@ -160,6 +166,28 @@ object BackupFormat {
                 widths = listOf(24, 12, 24, 16),
             )
         }
+        if (data.bills.isNotEmpty()) {
+            val partyAccounts = data.parties.associate { it.id to acc[it.accountId]?.name.orEmpty() }
+            w.sheet(
+                SHEET_BILLS,
+                listOf(listOf("Number", "Date", "Customer", "Walk-in name", "Account", "Discount", "Prices include GST", "Other state", "Note", "Book")) + data.bills.map { b ->
+                    listOf(
+                        b.number, b.date, b.partyId?.let { partyAccounts[it] }.orEmpty(), b.customerName, b.accountId?.let { acc[it]?.name }.orEmpty(),
+                        b.discount.takeIf { it > 0 }?.let(::MoneyCell), if (b.pricesIncludeGst) "Yes" else "", if (b.interState) "Yes" else "", b.note, bookOf(b.bookId),
+                    )
+                },
+                widths = listOf(12, 14, 24, 20, 18, 12, 10, 10, 30, 16),
+            )
+            w.sheet(
+                SHEET_BILL_ITEMS,
+                listOf(listOf("Bill", "Book", "Item", "Quantity", "Unit", "Rate", "GST %", "HSN")) + data.bills.flatMap { b ->
+                    b.items.map { i ->
+                        listOf(b.number, bookOf(b.bookId), i.name, BillMath.quantityText(i.quantity), i.unit, MoneyCell(i.rate), BillMath.rateText(i.gstRate), i.hsn)
+                    }
+                },
+                widths = listOf(12, 16, 30, 10, 8, 12, 8, 10),
+            )
+        }
         if (data.books.size > 1) {
             w.sheet(SHEET_BOOKS, listOf(listOf("Name", "Type")) + data.books.map { listOf(it.name, bookKindName(it.kind)) }, widths = listOf(24, 12))
         }
@@ -190,7 +218,7 @@ object BackupFormat {
             val fields = listOf(
                 t.date.toString(), typeName(t.type), java.math.BigDecimal.valueOf(t.amount, 2).toPlainString(),
                 t.categoryId?.let { cat[it]?.name }.orEmpty(), acc[t.accountId]?.name.orEmpty(),
-                t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t), txBook(t),
+                t.toAccountId?.let { acc[it]?.name }.orEmpty(), t.note, loanName(t), txBook(t), data.bills.firstOrNull { it.id == t.billId }?.number.orEmpty(),
             )
             out.write(fields.joinToString(",") { csv(it) } + "\r\n")
         }

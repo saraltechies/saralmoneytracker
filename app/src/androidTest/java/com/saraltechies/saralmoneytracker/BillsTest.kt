@@ -201,6 +201,24 @@ class BillsTest {
         assertEquals(rupees(100), repo.partyItem(view.bill.partyId!!)!!.balance)
     }
 
+    /** The credit ledger is one tap from Home, like loans, even with a long book name on a small phone. */
+    @Test
+    fun theLedgerOpensFromHome() {
+        runBlocking {
+            fresh()
+            val shop = repo.createBook("Sharma General Traders", com.saraltechies.saralmoneytracker.model.BookKind.BUSINESS)
+            app.settings.setBook(shop)
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            wait(hasContentDescription(s(R.string.loans_title)))
+            shot("home-top-bar")
+            click(s(R.string.ledger_title))
+            see(s(R.string.ledger_title))
+            wait(hasText(s(R.string.ledger_customers), substring = true))
+            shot("home-ledger-opened")
+        }
+    }
+
     private fun see(text: String) = wait(hasText(text))
 
     private fun click(text: String) {

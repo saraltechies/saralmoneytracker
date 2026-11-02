@@ -222,6 +222,26 @@ fun LoanDetailScreen(
                 }
             }
             loan.pledge?.let { p -> item { PledgeCard(p, lent) } }
+            LoanMath.givenDateIfDifferent(loan, current.events)?.let { givenOn ->
+                item {
+                    Card(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    ) {
+                        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
+                            Text(
+                                stringResource(R.string.loan_dates_differ, Dates.medium(loan.startDate), Dates.medium(givenOn), Dates.medium(maxOf(loan.startDate, givenOn))),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Row {
+                                listOf(loan.startDate, givenOn).sorted().forEach { day ->
+                                    TextButton(onClick = { scope.launch { repository.setLoanStartDate(loan, day) } }) { Text(Dates.medium(day)) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             if (s.settled && !loan.closed && s.given > 0) {
                 // Items still held go back when the loan is paid off, so that's offered together with closing it.
                 val itemsHeld = loan.pledge?.returned == false
@@ -356,7 +376,10 @@ fun LoanDetailScreen(
                             is EntryMode.Edit -> {
                                 val (kind, amount) = kindAmounts.first()
                                 val txn = mode.event.txnId?.let { id -> current.txns.firstOrNull { it.id == id } }
-                                if (txn == null) repository.setLoanOpening(current.loan, amount)
+                                if (txn == null) {
+                                    repository.setLoanOpening(current.loan, amount)
+                                    if (date != current.loan.startDate) repository.setLoanStartDate(current.loan, date)
+                                }
                                 else repository.updateLoanEntry(current.loan, txn, kind, amount, date, accountId, note)
                             }
                             else -> {
@@ -465,6 +488,7 @@ private fun EntryDialog(
     val editingTxn = editing?.txnId?.let { id -> item.txns.firstOrNull { it.id == id } }
     val isOpening = editing != null && editing.txnId == null
     val isPayment = mode is EntryMode.Payment
+    val firstGiven = LoanMath.firstGiven(item.events)
 
     var amountText by rememberSaveable {
         mutableStateOf(
@@ -555,6 +579,7 @@ private fun EntryDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
+                    PickerRow(Icons.Filled.CalendarToday, stringResource(R.string.date), Dates.medium(date), onClick = { pickDate = true }, modifier = Modifier.padding(top = 4.dp))
                     Text(stringResource(R.string.loan_before_app_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                 }
                 error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
@@ -565,6 +590,9 @@ private fun EntryDialog(
                 error = when {
                     amount == null || amount <= 0 -> R.string.error_amount
                     showInterest && interest > amount -> R.string.error_interest_part
+                    // Only a new or changed date is checked, so an old entry can still have its amount corrected.
+                    date != editing?.date && editing != null && editing == firstGiven && item.events.any { it != editing && it.date.isBefore(date) } -> R.string.error_loan_date_after_entry
+                    date != editing?.date && (editing == null || editing != firstGiven) && date.isBefore(loan.startDate) -> R.string.error_loan_entry_before_start
                     !isOpening && accounts.none { it.id == accountId } -> R.string.error_account
                     else -> null
                 }

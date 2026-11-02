@@ -145,7 +145,8 @@ fun LoanEditScreen(
         monthly = l.plan == LoanPlan.MONTHLY
         monthsText = if (l.installments > 0) l.installments.toString() else ""
         installmentText = if (l.installment > 0) Money.plain(l.installment) else ""
-        installmentEdited = l.installment > 0
+        // Only an amount typed by hand stays fixed; a worked-out one follows the rate and months.
+        installmentEdited = l.installment > 0 && l.installment != LoanMath.emi(item.summary.given, LoanMath.monthlyRate(l), l.installments)
         note = l.note
         l.pledge?.let { p ->
             pledgeKind = p.kind
@@ -185,6 +186,10 @@ fun LoanEditScreen(
             monthly && installment <= 0 -> R.string.error_installment
             pledgeKind != null && weightMg == null -> R.string.error_weight
             isNew && accountId == 0L -> R.string.error_account
+            existing?.let { item ->
+                val first = LoanMath.firstGiven(item.events)
+                date != item.loan.startDate && item.events.any { it !== first && it.date.isBefore(date) }
+            } == true -> R.string.error_loan_date_after_entry
             else -> null
         }
         if (error != null || principal == null) return

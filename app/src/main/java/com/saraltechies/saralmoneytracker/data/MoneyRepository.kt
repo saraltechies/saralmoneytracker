@@ -557,10 +557,18 @@ class MoneyRepository(private val context: Context) {
         }
     }
 
-    suspend fun deleteTxn(id: Long) = write { it.delete(T_TXNS, "id = ?", arrayOf(id.toString())) }
+    suspend fun deleteTxn(id: Long) = write { w ->
+        val txn = w.query(T_TXNS, null, "id = ?", arrayOf(id.toString()), null, null, null).use { c -> if (c.moveToFirst()) MoneyDb.txn(c) else null }
+        w.delete(T_TXNS, "id = ?", arrayOf(id.toString()))
+        // Deleting the first money given: the loan now starts with the next.
+        txn?.loanId?.let { loanId -> loanIn(w, loanId)?.takeIf { it.startDate == txn.date }?.let { syncLoanStart(w, it) } }
+    }
 
     /** Puts a deleted entry back (Undo), with its original id. */
-    suspend fun restoreTxn(t: Txn) = write { it.insertWithOnConflict(T_TXNS, null, MoneyDb.values(t), SQLiteDatabase.CONFLICT_REPLACE) }
+    suspend fun restoreTxn(t: Txn) = write { w ->
+        w.insertWithOnConflict(T_TXNS, null, MoneyDb.values(t), SQLiteDatabase.CONFLICT_REPLACE)
+        t.loanId?.let { loanId -> loanIn(w, loanId)?.takeIf { t.date.isBefore(it.startDate) }?.let { syncLoanStart(w, it) } }
+    }
 
     suspend fun saveAccount(a: Account): Long = write { w ->
         if (a.id == 0L) {
@@ -694,8 +702,36 @@ class MoneyRepository(private val context: Context) {
             "id = ?", arrayOf(loan.id.toString()),
         )
         w.execSQL("UPDATE $T_ACCOUNTS SET name = ?, book_id = ? WHERE id = ?", arrayOf<Any?>(uniqueAccountName(w, terms.name.trim(), loan.accountId), terms.bookId, loan.accountId))
+        // The money was given on the new date too, so the interest runs from it.
+        if (terms.startDate != loan.startDate) moveLoanStart(w, loan, terms.startDate)
         // The old contact goes once nothing uses it.
         if (loan.contactId != null && loan.contactId != contactId) deleteContactIfUnused(w, loan.contactId)
+    }
+
+    /** Sets the day a loan started, and the first money given along with it. */
+    suspend fun setLoanStartDate(loan: Loan, date: LocalDate) = write { w -> moveLoanStart(w, loan, date) }
+
+    private fun loanIn(w: SQLiteDatabase, id: Long): Loan? = w.query(T_LOANS, null, "id = ?", arrayOf(id.toString()), null, null, null)
+        .use { c -> if (c.moveToFirst()) MoneyDb.loan(c) else null }
+
+    /** The first money given from an account, or null for a loan from before the app, which starts with its opening balance. */
+    private fun firstGivenIn(w: SQLiteDatabase, loan: Loan): LoanEvent? {
+        val opening = w.rawQuery("SELECT opening FROM $T_ACCOUNTS WHERE id = ?", arrayOf(loan.accountId.toString())).use { c -> if (c.moveToFirst()) c.getLong(0) else 0L }
+        if (opening != 0L) return null
+        val txns = w.query(T_TXNS, null, "loan_id = ?", arrayOf(loan.id.toString()), null, null, "day, created")
+            .use { c -> buildList { while (c.moveToNext()) add(MoneyDb.txn(c)) } }
+        return LoanMath.firstGiven(LoanMath.events(loan, 0, txns))
+    }
+
+    private fun moveLoanStart(w: SQLiteDatabase, loan: Loan, date: LocalDate) {
+        firstGivenIn(w, loan)?.txnId?.let { w.execSQL("UPDATE $T_TXNS SET day = ? WHERE id = ?", arrayOf<Any?>(date.toEpochDay(), it)) }
+        w.execSQL("UPDATE $T_LOANS SET start_day = ? WHERE id = ?", arrayOf<Any?>(date.toEpochDay(), loan.id))
+    }
+
+    /** Makes the start date the day the first money was given, after that entry changed. */
+    private fun syncLoanStart(w: SQLiteDatabase, loan: Loan) {
+        val first = firstGivenIn(w, loan) ?: return
+        w.execSQL("UPDATE $T_LOANS SET start_day = ? WHERE id = ?", arrayOf<Any?>(first.date.toEpochDay(), loan.id))
     }
 
     // ---- Contacts -----------------------------------------------------------------------------------------
@@ -754,6 +790,8 @@ class MoneyRepository(private val context: Context) {
         val categoryId = if (kind == LoanEventKind.INTEREST) (txn.categoryId ?: interestCategory(w, loan.direction, loan.bookId)) else null
         val updated = loanTxn(loan.direction, loan.accountId, loan.id, kind, amount, date, accountId, note.trim(), categoryId).copy(id = txn.id, createdAt = txn.createdAt)
         w.update(T_TXNS, MoneyDb.values(updated), "id = ?", arrayOf(txn.id.toString()))
+        // The first money given sets the day the loan started, and with it the interest and due dates.
+        if (kind == LoanEventKind.GIVEN && (txn.date == loan.startDate || date.isBefore(loan.startDate))) syncLoanStart(w, loan)
     }
 
     /** The amount of a loan given before using the app (kept as the loan account's opening balance). */

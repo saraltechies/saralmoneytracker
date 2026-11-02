@@ -472,6 +472,9 @@
     <string name="txn_loan_repaid">Repaid to %1$s</string>
     <string name="error_loan_name">Enter the person\'s name</string>
     <string name="error_rate">Enter the interest rate</string>
+    <string name="error_loan_date_after_entry">This date is after another entry of this loan. Move or delete that entry first.</string>
+    <string name="error_loan_entry_before_start">This date is before the loan started. To start the loan earlier, change its date first.</string>
+    <string name="loan_dates_differ">This loan has two dates: it starts on %1$s, but the money was given on %2$s. Interest runs from %3$s. Which date is right?</string>
     <string name="error_months">Enter the number of months (1 to 600)</string>
     <string name="error_installment">Enter the monthly amount</string>
     <string name="error_interest_part">The interest can\'t be more than the amount</string>

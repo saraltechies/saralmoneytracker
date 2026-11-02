@@ -205,12 +205,19 @@ object LoanMath {
         var balance = 0L
         var since: LocalDate? = null
         for (e in sorted) {
+            // Paying interest doesn't change the principal, so it mustn't change how the interest is worked out.
+            if (e.kind == LoanEventKind.INTEREST) {
+                interestPaid += e.amount
+                continue
+            }
             since?.let { if (rate > 0 && balance > 0) accrued += balance * rate * monthsBetween(it, e.date) }
             since = maxOf(e.date, loan.startDate)
-            when (e.kind) {
-                LoanEventKind.GIVEN -> { given += e.amount; balance += e.amount }
-                LoanEventKind.REPAID -> { repaid += e.amount; balance -= e.amount }
-                LoanEventKind.INTEREST -> interestPaid += e.amount
+            if (e.kind == LoanEventKind.GIVEN) {
+                given += e.amount
+                balance += e.amount
+            } else {
+                repaid += e.amount
+                balance -= e.amount
             }
         }
         since?.let { if (rate > 0 && balance > 0) accrued += balance * rate * monthsBetween(it, asOf) }
@@ -285,6 +292,15 @@ object LoanMath {
         }
         return list.sortedBy { it.date }
     }
+
+    /** The first money given: its date is the loan's start date. */
+    fun firstGiven(events: List<LoanEvent>): LoanEvent? = events.filter { it.kind == LoanEventKind.GIVEN }.minByOrNull { it.date }
+
+    /**
+     * The day the first money was given, when it isn't the loan's start date. Versions before 1.7.1 could leave a
+     * loan like this, and only the person knows which date is right, so the loan's screen asks.
+     */
+    fun givenDateIfDifferent(loan: Loan, events: List<LoanEvent>): LocalDate? = firstGiven(events)?.date?.takeIf { it != loan.startDate }
 
     /** Splits a payment: interest still due is paid first, the rest goes to the principal. */
     fun split(amount: Long, interestDue: Long): Pair<Long, Long> {

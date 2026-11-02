@@ -15,6 +15,8 @@ import com.saraltechies.saralmoneytracker.model.PartyRole
 import com.saraltechies.saralmoneytracker.model.LoanDirection
 import com.saraltechies.saralmoneytracker.model.LoanPlan
 import com.saraltechies.saralmoneytracker.model.RateUnit
+import com.saraltechies.saralmoneytracker.model.Bill
+import com.saraltechies.saralmoneytracker.model.BillItem
 import com.saraltechies.saralmoneytracker.model.Pledge
 import com.saraltechies.saralmoneytracker.model.PledgeKind
 import com.saraltechies.saralmoneytracker.model.Recurring
@@ -217,6 +219,42 @@ class SpreadsheetImportTest {
 
         assertEquals(listOf(chain, anklets), result.loans.map { it.pledge })
         assertEquals(listOf(1200L, 1800L), result.loans.map { it.rate })
+    }
+
+    @Test
+    fun backupKeepsBills() {
+        val accounts = listOf(Account(id = 1, name = "Cash", type = AccountType.CASH), Account(id = 5, name = "Anita", type = AccountType.PARTY))
+        val party = Party(id = 3, accountId = 5, contactId = null, role = PartyRole.CUSTOMER)
+        val items = listOf(BillItem("Rice", 2500, "kg", 6000, 500, "1006"), BillItem("Soap", 1000, "", 3000))
+        val bills = listOf(
+            Bill(id = 1, number = "A-1", date = d("2026-03-01"), partyId = 3, discount = 1000, interState = true, note = "Thanks", items = items),
+            Bill(id = 2, number = "A-2", date = d("2026-03-02"), customerName = "Ravi", accountId = 1, pricesIncludeGst = true, items = items.take(1)),
+        )
+        val txns = listOf(
+            Txn(id = 1, type = TxnType.INCOME, amount = 17000, date = d("2026-03-01"), categoryId = null, accountId = 5, note = "Bill A-1", billId = 1),
+            Txn(id = 2, type = TxnType.TRANSFER, amount = 5000, date = d("2026-03-02"), categoryId = null, accountId = 5, toAccountId = 1, note = "Paid", billId = 1),
+            Txn(id = 3, type = TxnType.EXPENSE, amount = 100, date = d("2026-03-02"), categoryId = null, accountId = 1, note = "Tea"),
+        )
+        val out = ByteArrayOutputStream()
+        BackupFormat.writeXlsx(BackupFormat.Data(accounts, emptyList(), txns, emptyList(), parties = listOf(party), bills = bills), out, d("2026-03-03"), "1.8.0")
+        val result = SpreadsheetImport.read(XlsxReader.read(ByteArrayInputStream(out.toByteArray())))
+
+        assertEquals(listOf("A-1", "A-2"), result.bills.map { it.number })
+        val first = result.bills[0]
+        assertEquals("Anita", first.customer)
+        assertEquals(items, first.items)
+        assertEquals(1000L, first.discount)
+        assertTrue(first.interState)
+        assertEquals("Thanks", first.note)
+        val second = result.bills[1]
+        assertEquals(null, second.customer)
+        assertEquals("Ravi", second.name)
+        assertEquals("Cash", second.account)
+        assertTrue(second.pricesIncludeGst)
+        // Entries name their bill, so they're linked again on import; others don't.
+        assertEquals("A-1", result.rows.single { it.note == "Bill A-1" }.bill)
+        assertEquals("A-1", result.rows.single { it.note == "Paid" }.bill)
+        assertEquals(null, result.rows.single { it.note == "Tea" }.bill)
     }
 
     @Test

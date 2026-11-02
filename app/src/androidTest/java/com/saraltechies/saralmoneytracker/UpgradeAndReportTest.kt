@@ -34,6 +34,7 @@ class UpgradeAndReportTest {
 
     @Test
     fun version1DataMovesToPersonalBook(): Unit = runBlocking {
+        (context.applicationContext as SaralMoneyTrackerApp).repository.close()
         context.deleteDatabase(MoneyDb.NAME)
         // The 1.0 schema, exactly as it shipped.
         SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(MoneyDb.NAME).apply { parentFile?.mkdirs() }, null).use { db ->
@@ -92,6 +93,7 @@ class UpgradeAndReportTest {
 
         val dir = File(context.getExternalFilesDir(null), "preview").apply { mkdirs() }
         File(dir, "business-report.pdf").outputStream().use { ReportPdf(context, Currencies.of("INR")).write(report, repo.myDetails(shop), it) }
+        (context.applicationContext as SaralMoneyTrackerApp).repository.close()
         context.deleteDatabase(MoneyDb.NAME)
     }
 }

@@ -37,6 +37,7 @@ class LedgerAndWidgetTest {
 
     @Test
     fun creditLedgerFlow(): Unit = runBlocking {
+        (context.applicationContext as SaralMoneyTrackerApp).repository.close()
         context.deleteDatabase(MoneyDb.NAME)
         val repo = MoneyRepository(context)
         val shop = repo.createBook("Sharma Traders", BookKind.BUSINESS)
@@ -69,6 +70,7 @@ class LedgerAndWidgetTest {
         File(dir, "credit-ledger-statement.pdf").outputStream().use {
             PartyStatementPdf(context, Currencies.of("INR")).write(item, repo.myDetails(shop), repo.accounts(book = Books.ALL).associate { a -> a.id to a.name }, it)
         }
+        (context.applicationContext as SaralMoneyTrackerApp).repository.close()
         context.deleteDatabase(MoneyDb.NAME)
     }
 

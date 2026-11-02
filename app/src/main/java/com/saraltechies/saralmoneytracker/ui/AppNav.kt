@@ -50,6 +50,9 @@ import com.saraltechies.saralmoneytracker.ui.loans.LoanDetailScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoanEditScreen
 import com.saraltechies.saralmoneytracker.ui.loans.LoansScreen
 import com.saraltechies.saralmoneytracker.ui.loans.PersonLoansScreen
+import com.saraltechies.saralmoneytracker.ui.bills.BillDetailScreen
+import com.saraltechies.saralmoneytracker.ui.bills.BillEditScreen
+import com.saraltechies.saralmoneytracker.ui.bills.BillsScreen
 import com.saraltechies.saralmoneytracker.ui.recurring.RecurringScreen
 import com.saraltechies.saralmoneytracker.ui.settings.SettingsScreen
 import com.saraltechies.saralmoneytracker.ui.setup.SetupScreen
@@ -86,6 +89,12 @@ private object Routes {
     const val LOAN = "loan/{id}"
     const val LOAN_EDIT = "loanEdit?id={id}&dir={dir}&contact={contact}"
     const val LOAN_PERSON = "loanPerson/{key}"
+    const val BILLS = "bills"
+    const val BILL = "bill/{id}"
+    const val BILL_EDIT = "billEdit?id={id}&party={party}"
+
+    fun bill(id: Long) = "bill/$id"
+    fun billEdit(id: Long = 0, party: Long = 0) = "billEdit?id=$id&party=$party"
 
     fun loan(id: Long) = "loan/$id"
     fun loanEdit(id: Long = 0, dir: LoanDirection = LoanDirection.LENT, contact: Long = 0) = "loanEdit?id=$id&dir=${dir.name}&contact=$contact"
@@ -161,6 +170,7 @@ fun AppNav(
                 when (target) {
                     WhatsNewTarget.BOOKS -> nav.navigate(Routes.BOOKS)
                     WhatsNewTarget.LEDGER -> nav.navigate(Routes.LEDGER)
+                    WhatsNewTarget.BILLS -> nav.navigate(Routes.BILLS)
                     WhatsNewTarget.LOANS -> nav.navigate(Routes.LOANS)
                     WhatsNewTarget.BACKUP -> nav.navigate(Routes.settings(backup = true))
                     WhatsNewTarget.FORECAST -> nav.navigate(Routes.FORECAST)
@@ -260,6 +270,7 @@ fun AppNav(
                     onTransfer = { nav.navigate(Routes.edit(type = TxnType.TRANSFER)) },
                     onOpenLoans = { nav.navigate(Routes.LOANS) },
                     onOpenLedger = { nav.navigate(Routes.LEDGER) },
+                    onOpenBills = { nav.navigate(Routes.BILLS) },
                 )
             }
             composable(
@@ -294,6 +305,10 @@ fun AppNav(
                     onOpenLoan = { id ->
                         nav.popBackStack()
                         nav.navigate(Routes.loan(id))
+                    },
+                    onOpenBill = { id ->
+                        nav.popBackStack()
+                        nav.navigate(Routes.bill(id))
                     },
                 )
             }
@@ -345,6 +360,8 @@ fun AppNav(
                     onBack = { nav.popBackStack() },
                     onEdit = { nav.navigate(Routes.partyEdit(id = id)) },
                     onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
+                    onNewBill = { nav.navigate(Routes.billEdit(party = id)) },
+                    onOpenBill = { nav.navigate(Routes.bill(it)) },
                 )
             }
             composable(
@@ -363,6 +380,46 @@ fun AppNav(
                     onSaved = { id ->
                         nav.popBackStack()
                         nav.navigate(Routes.party(id))
+                    },
+                )
+            }
+            composable(Routes.BILLS) {
+                BillsScreen(
+                    repository,
+                    onBack = { nav.popBackStack() },
+                    onOpen = { nav.navigate(Routes.bill(it)) },
+                    onNew = { nav.navigate(Routes.billEdit()) },
+                )
+            }
+            composable(Routes.BILL, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                BillDetailScreen(
+                    repository = repository,
+                    settings = settings,
+                    billId = id,
+                    onBack = { nav.popBackStack() },
+                    onEdit = { nav.navigate(Routes.billEdit(id = id)) },
+                    onOpenCustomer = { nav.navigate(Routes.party(it)) },
+                    onMyDetails = { nav.navigate(Routes.MY_DETAILS) },
+                )
+            }
+            composable(
+                Routes.BILL_EDIT,
+                arguments = listOf(
+                    navArgument("id") { type = NavType.LongType; defaultValue = 0L },
+                    navArgument("party") { type = NavType.LongType; defaultValue = 0L },
+                ),
+            ) { entry ->
+                BillEditScreen(
+                    repository = repository,
+                    settings = settings,
+                    billId = entry.arguments?.getLong("id") ?: 0L,
+                    initialPartyId = entry.arguments?.getLong("party") ?: 0L,
+                    onBack = { nav.popBackStack() },
+                    // A new bill opens on its own screen, ready to send.
+                    onSaved = { id ->
+                        nav.popBackStack()
+                        nav.navigate(Routes.bill(id))
                     },
                 )
             }

@@ -206,7 +206,7 @@ fun LoanEditScreen(
             installments = if (monthly) months else 0, installment = if (monthly) installment else 0, note = note, bookId = bookId,
             pledge = pledge,
         )
-        scope.launch {
+        scope.launch(Dispatchers.Main.immediate) {
             val item = existing
             if (item == null) {
                 val id = repository.createLoan(terms, principal, accountId.takeIf { it > 0 }, contact)

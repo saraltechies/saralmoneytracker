@@ -39,10 +39,11 @@ jobs:
           script: |
             ./gradlew installDebug installDebugAndroidTest --stacktrace
             adb shell am instrument -w -e notClass com.saraltechies.saralmoneytracker.StoreScreenshotsTest com.saraltechies.saralmoneytracker.debug.test/androidx.test.runner.AndroidJUnitRunner | tee instrument.txt
-            grep -q "OK (" instrument.txt
             mkdir -p preview
             adb pull /sdcard/Android/data/com.saraltechies.saralmoneytracker.debug/files/preview/. preview/ || true
+            grep -q "OK (" instrument.txt
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: statement-preview
           path: preview/

@@ -74,7 +74,7 @@ fun BillsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onNew,
-                icon = { Icon(Icons.Filled.Add, null) },
+                icon = { Icon(Icons.Filled.Add, stringResource(R.string.bill_new)) },
                 text = { Text(stringResource(R.string.bill_new)) },
             )
         },

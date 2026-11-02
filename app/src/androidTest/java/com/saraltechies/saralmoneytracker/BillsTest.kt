@@ -204,7 +204,8 @@ class BillsTest {
     private fun see(text: String) = wait(hasText(text))
 
     private fun click(text: String) {
-        val matcher = (hasText(text) or hasContentDescription(text)) and hasClickAction()
+        // A floating button keeps its label in a child node.
+        val matcher = (hasText(text) or hasContentDescription(text) or androidx.compose.ui.test.hasAnyChild(hasText(text))) and hasClickAction()
         wait(matcher)
         compose.onAllNodes(matcher).onFirst().performClick()
         compose.waitForIdle()

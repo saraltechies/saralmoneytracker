@@ -8,7 +8,7 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">](https://play.google.com/store/apps/details?id=com.saraltechies.saralmoneytracker)
 -->
 
-## Features (1.7)
+## Features (1.8)
 
 - **Fast entry**: an on-screen keypad that also adds up sums (`250+120+45`), your most used categories first (with **More**
   and a search for the rest), today/yesterday chips, and
@@ -31,6 +31,11 @@ Free and open source (GPL-3.0). No ads, no account, and no internet permission: 
   interest due, the EMI plan with paid and late instalments, and what is overdue; a payment is split into interest and
   principal for you. Each loan has its own account, so balances and net worth stay right and only the interest counts as
   income or spending. A reminder on the day a payment is due.
+- **Bills for shopkeepers**: make a bill with items (quantity, unit, rate), a discount and optional GST (CGST and SGST, or IGST
+  for another state; rates with or without GST; HSN codes), for a customer on credit or a walk-in sale. Things sold before
+  come up as you type. Numbers follow on by themselves. Send it as a PDF with your shop's details and a UPI scan-to-pay code.
+  A bill records the sale once and goes into the customer's account, so the balance, reminders and profit stay right; GST is
+  kept in its own category. Payments can be taken against a bill, and a "You got" in the ledger settles the oldest bills first.
 - **Gold and silver loans (girvi)**: a loan can have gold, silver or other items kept as security, with the items, weight in
   grams, purity and value. The same person can pledge several times, each loan at its own rate (12% a year on a chain, 18%
   later on bangles); their account adds up every loan, the interest due and the gold and silver held, and items are marked

@@ -1,6 +1,6 @@
 # Saral Money Tracker – Google Play store listing (en-IN / en-US)
 
-Every claim below matches the code as of 1.7.1. Re-check before each release.
+Every claim below matches the code as of 1.8.0. Re-check before each release.
 
 ## App name (max 30)
 Saral Money Tracker
@@ -14,7 +14,6 @@ Saral Money Tracker is a simple, private way to track your income and expenses. 
 ADD AN ENTRY IN SECONDS
 • A keypad that adds up sums for you: type 250+120+45 and save ₹415
 • Your most used categories come first, with More and a search for the rest; your last used account is chosen for you
-• Notes, and search across every note and category
 
 DAILY, WEEKLY, MONTHLY AND YEARLY VIEWS
 • Switch between day, week, month, year or any date range
@@ -42,6 +41,11 @@ LENT AND BORROWED MONEY
 • Phone, address, PAN/GSTIN, bank and UPI details for each person or bank
 • Send a PDF loan statement with the running balance, EMI plan and a UPI scan-to-pay code
 
+BILLS FOR YOUR SHOP
+• Make a bill with items, discount and GST, for a customer or a walk-in sale
+• Send it as a PDF with a UPI scan-to-pay code
+• Sales and customer balances update by themselves
+
 GOLD AND SILVER LOANS (GIRVI)
 • Gold, silver or other items kept against a loan, with weight, purity and value
 • The same person can pledge again at another rate: each loan keeps its own rate and items
@@ -56,7 +60,6 @@ PERSONAL AND BUSINESS, KEPT APART
 CREDIT LEDGER FOR CUSTOMERS AND SUPPLIERS
 • Record what you gave and got on credit in two taps, with a running balance for each person
 • Send a payment reminder on WhatsApp or SMS, with your UPI ID
-• PDF account statement with a UPI scan-to-pay code
 • Credit period for each customer: see what is overdue and since when
 
 CASH FLOW AHEAD
@@ -68,7 +71,6 @@ REPEATING ENTRIES
 
 BRING YOUR EXCEL SHEET
 • Import your old expense tracker, including monthly "Money Out / Money In" sheets
-• Also reads bank statements with Debit and Credit columns
 • Export everything to Excel (a full backup you can import again) or CSV
 
 PRIVATE AND SECURE
@@ -80,7 +82,6 @@ PRIVATE AND SECURE
 ALSO
 • 29 currencies, with Indian number format for rupees (₹1,25,000)
 • Your own categories with 49 icons and 20 colours
-• Optional daily reminder, only on days you haven't added anything
 • Morning alerts for bills coming up and payments due, and a monthly summary
 • Home-screen widget and a quick-settings tile to add an expense in a tap
 • Light and dark themes, launcher shortcuts for Add expense, Add income and Transfer

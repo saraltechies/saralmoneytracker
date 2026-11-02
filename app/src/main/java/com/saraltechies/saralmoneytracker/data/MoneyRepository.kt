@@ -179,6 +179,9 @@ class MoneyRepository(private val context: Context) {
 
     private fun resolve(book: Long?): Long = book ?: scope.value
 
+    /** Lets go of the database file; it opens again on the next read or write. */
+    fun close() = db.close()
+
     /** The book new accounts, categories and loans go to: the one on screen, or Personal when showing all. */
     fun defaultBook(): Long = scope.value.takeIf { it != Books.ALL } ?: Books.PERSONAL_ID
 

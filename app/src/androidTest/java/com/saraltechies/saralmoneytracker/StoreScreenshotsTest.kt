@@ -13,6 +13,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.saraltechies.saralmoneytracker.data.LoanTerms
 import com.saraltechies.saralmoneytracker.model.AccountType
+import com.saraltechies.saralmoneytracker.model.Bill
+import com.saraltechies.saralmoneytracker.model.BillItem
 import com.saraltechies.saralmoneytracker.model.BookKind
 import com.saraltechies.saralmoneytracker.model.Contact
 import com.saraltechies.saralmoneytracker.model.ContactKind
@@ -86,6 +88,16 @@ class StoreScreenshotsTest {
             shot("9-girvi-loan")
             back()
             back()
+            settle()
+            back()
+            settle()
+
+            click(s(R.string.bills_title))
+            shot("10-bills")
+            click("INV-0042", substring = true)
+            shot("11-bill")
+            back()
+            settle()
             back()
             settle()
 
@@ -266,6 +278,13 @@ class StoreScreenshotsTest {
             // The first loan's interest was paid for a few months.
             if (monthsAgo == 8L) repo.addLoanEntries(item.loan, listOf(LoanEventKind.INTEREST to rupees(2_500)), today.minusMonths(3), bank.id, "Interest, 5 months")
         }
+        // Bills: one on credit with GST, part paid, and walk-in sales.
+        val rice = BillItem("Basmati rice, 25 kg bag", 4000, "bag", rupees(1_850), 500, "1006")
+        val oil = BillItem("Refined oil, 15 L tin", 2000, "tin", rupees(2_150), 500, "1512")
+        val soap = BillItem("Detergent powder", 12_500, "kg", rupees(95), 1800, "3402")
+        repo.createBill(Bill(number = "INV-0040", date = today.minusDays(4), bookId = shop, partyId = pr.id, items = listOf(oil)))
+        repo.createBill(Bill(number = "INV-0041", date = today.minusDays(1), bookId = shop, customerName = "Ravi Kumar", accountId = cash.id, items = listOf(soap)))
+        repo.createBill(Bill(number = "INV-0042", date = today, bookId = shop, partyId = pa.id, discount = rupees(100), items = listOf(rice, oil, soap)), received = rupees(5_000), receivedIn = bank.id)
         repo.processRecurring()
     }
 }

@@ -143,7 +143,7 @@ class BillPdf(private val context: Context, private val currency: CurrencyInfo) 
         y += 12f
     }
 
-    private fun columns(gst: Boolean) = if (gst) floatArrayOf(22f, 175f, 56f, 62f, 70f, 40f, 90f) else floatArrayOf(22f, 245f, 62f, 76f, 0f, 0f, 110f)
+    private fun columns(gst: Boolean) = if (gst) floatArrayOf(22f, 175f, 56f, 62f, 70f, 40f, 90f) else floatArrayOf(22f, 245f, 0f, 76f, 72f, 0f, 100f)
 
     private fun itemHeader(cols: FloatArray, gst: Boolean) {
         canvas.drawRect(margin, y, right, y + 18f, Paint().apply { color = navy })

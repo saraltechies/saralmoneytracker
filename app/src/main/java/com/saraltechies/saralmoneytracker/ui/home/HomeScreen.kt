@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -176,6 +177,7 @@ fun HomeScreen(
             TopAppBar(
                 title = { BookSwitcher(stringResource(R.string.app_name), onSelect = onSelectBook, onManage = onManageBooks) },
                 actions = {
+                    IconButton(onClick = onOpenLedger) { Icon(Icons.Filled.Storefront, stringResource(R.string.ledger_title)) }
                     IconButton(onClick = onOpenLoans) { Icon(Icons.Filled.Handshake, stringResource(R.string.loans_title)) }
                     IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, stringResource(R.string.search)) }
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }

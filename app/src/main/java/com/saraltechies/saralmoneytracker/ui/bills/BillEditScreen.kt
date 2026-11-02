@@ -200,7 +200,7 @@ fun BillEditScreen(
             else -> null
         }
         if (error != null) return
-        scope.launch {
+        scope.launch(Dispatchers.Main.immediate) {
             if (withContext(Dispatchers.IO) { repository.billNumberTaken(bookId, number, billId) }) {
                 error = R.string.error_bill_number_taken
                 return@launch

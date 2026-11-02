@@ -154,4 +154,24 @@ class LoansTest {
         assertEquals(rupees(150) to 0L, LoanMath.split(rupees(150), rupees(200)))
         assertEquals(0L to rupees(500), LoanMath.split(rupees(500), 0))
     }
+
+    @Test
+    fun payingInterestDoesNotChangeTheInterestWorkedOut() {
+        val start = LocalDate.of(2026, 1, 30)
+        val loan = Loan(id = 1, accountId = 9, direction = LoanDirection.LENT, startDate = start, rate = 200)
+        val asOf = LocalDate.of(2026, 3, 1)
+        val without = LoanMath.summary(loan, listOf(given(rupees(10_000), start)), asOf)
+        val with = LoanMath.summary(loan, listOf(given(rupees(10_000), start), interest(rupees(100), LocalDate.of(2026, 2, 15))), asOf)
+        assertEquals(without.interestAccrued, with.interestAccrued)
+        assertEquals(without.interestDue - rupees(100), with.interestDue)
+    }
+
+    @Test
+    fun theFirstMoneyGivenSetsTheStart() {
+        val feb = LocalDate.of(2026, 2, 1)
+        val loan = lent(rate = 200)
+        assertNull(LoanMath.givenDateIfDifferent(loan, listOf(given(rupees(100)), given(rupees(100), feb))))
+        assertEquals(feb, LoanMath.givenDateIfDifferent(loan, listOf(given(rupees(100), feb))))
+        assertNull(LoanMath.givenDateIfDifferent(loan, listOf(interest(rupees(1), feb))))
+    }
 }

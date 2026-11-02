@@ -75,7 +75,17 @@ The app does not use SMS, call log, location, contacts or all-files access.
   (graphics path, DataStore) that Google ships already stripped, so there are no symbols to upload.
 - Deobfuscation file: nothing to do. The build puts `mapping.txt` inside the AAB and Play picks it up (App bundle
   explorer → Downloads shows it as "ReTrace mapping file").
-- Release name: `1.7.0 (9)` (earlier: `1.6.1 (8)`, `1.6.0 (7)`, `1.5.0 (6)`, `1.4.0 (5)`, `1.3.0 (4)`, `1.2.0 (3)`, `1.1.0 (2)`, `1.0.0 (1)`)
+- Release name: `1.7.1 (10)` (earlier: `1.7.0 (9)`, `1.6.1 (8)`, `1.6.0 (7)`, `1.5.0 (6)`, `1.4.0 (5)`, `1.3.0 (4)`, `1.2.0 (3)`, `1.1.0 (2)`, `1.0.0 (1)`)
+- Release notes for 1.7.1 (en-IN):
+  ```
+  <en-IN>
+  Fixed: interest now updates when you change a loan's date.
+  • Changing the start date or the first Given entry moves both, and the interest follows
+  • Loans with two different dates ask you which one is right
+  • Paying interest no longer changes the interest worked out
+  • EMI follows the rate and months when you edit a loan
+  </en-IN>
+  ```
 - Release notes for 1.7.0 (en-IN):
   ```
   <en-IN>
